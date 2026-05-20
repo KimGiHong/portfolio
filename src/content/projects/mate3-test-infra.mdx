@@ -1,0 +1,54 @@
+---
+title: '테스트 0건의 RN 앱에 단위 테스트 도입'
+summary: '7개월 동안 테스트 코드가 없던 RN 앱에 Jest 베이스라인을 깔고, 회의의 신경계인 Zustand store 6종과 핫패스 utility, HTTP layer를 한 burst에 10 파일로 커버하기 시작했습니다.'
+teaser: '테스트 0 → 10 파일, 2,000줄+ 단일 burst, 직후 회귀 즉시 포착'
+role: 'Frontend Engineer'
+period: '2026.02'
+product: 'MeetMate (Mobile)'
+implementation: ai-paired
+stack:
+  - Jest 29
+  - React Native
+  - Zustand
+  - TypeScript
+highlights:
+  - '테스트 0건에서 10 파일 즉시 가동. 단일 burst에서 2,000줄+ 도입.'
+  - 'Zustand store 6종을 우선 커버. 회의의 신경계(member · auth · notification · room · track · shareLayout)부터.'
+  - '운영 문서 13종을 같이 묶어 정착. 인프라와 문서를 한 자리에서 시작.'
+  - '직후 사이클의 메모리 누수와 NaN 가드 회귀를 같은 store 테스트가 받쳐줌.'
+  - '핫패스 utility와 HTTP layer, WebSocket handler 2종도 함께 커버해 회의 도메인의 진실 영역을 우선 보호.'
+order: 10
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+빠른 빌드 7개월 동안 테스트 코드가 한 줄도 없었습니다. Zustand store와 WebSocket 핸들러에 회귀가 누적되고 있었고, "어디까지 동작하는지"를 누구도 자신 있게 말하지 못하는 상태였습니다.
+
+문제는 어디부터 손을 댈지였습니다. UI 컴포넌트 전체에 테스트를 깔기에는 시간이 너무 들고, 적당히 깔면 *진짜 깨지는 자리*는 커버되지 않습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  **회의의 신경계부터** 커버하기로 했습니다. UI는 변형이 많아 테스트 비용이 크지만, Zustand store는 입력→출력이 명확하고 회의 도메인의 *진짜 진실*이 살고 있는 자리입니다.
+</RevealOnScroll>
+
+Jest 베이스라인을 깔고, 회의의 신경계인 Zustand store 6종(멤버 · 인증 · 알림 · 회의실 · 트랙 · 공유 레이아웃)과 핫패스 utility, HTTP layer, WebSocket handler 2종부터 우선 커버했습니다.
+
+같은 커밋에 운영 문서 13종을 같이 묶었습니다. 인프라와 문서가 따로 정착하지 않게, *한 자리에서 같이 시작*시키는 게 다음 사람에게 더 분명한 신호였습니다.
+
+> 테스트 0 → 10이라는 숫자보다 중요한 건 *어떤 10인지*였습니다. UI 10개가 아니라 *회의의 신경계 10개*를 골랐다는 사실이 직후 사이클의 회귀를 잡아냈습니다.
+
+## 결과
+
+- 단일 커밋에서 **+9,706 라인** 도입 (테스트 2,000줄+, 운영 문서 ~6,700줄).
+- 테스트 0건 → **10 파일** 즉시 가동 (store 6 + service 1 + utils 1 + handlers 2).
+- 직후 사이클의 메모리 누수와 NaN 가드 회귀를 같은 store 테스트가 잡아냄.
+- 운영 문서 13종 동시 정착 — 프로젝트 개요부터 코딩 컨벤션까지 인프라와 함께.
+
+## 배운 점
+
+테스트 인프라를 *진작에 깔지 못한 책임*을 받아들이는 게 출발점이었습니다. 늦었다고 손을 안 대면 영원히 늦은 상태로 남습니다. *완벽한 커버리지 대신 진짜 깨지는 자리부터*라는 우선순위가 결과적으로 가장 큰 도움이 됐습니다.

@@ -1,0 +1,60 @@
+---
+title: '가상 배경 + 음성 변조 미디어 파이프라인 v3 → v4 정식 포팅'
+summary: '꺼져 있던 호스트 컨트롤을 라이브 회의에서 쓰이는 기능으로 되돌렸습니다. 가상 배경 7 모드와 음성 변조 6 preset을 v3 parity로 옮기고, 1.6MB WASM은 번들 예산 바깥으로 빼냈으며, 운영 이슈는 후속 fix 4건으로 끝까지 닫았습니다.'
+teaser: '가상 배경 7 모드 + 음성 6 preset v3 parity, 1.6MB WASM 번들 외부로'
+role: 'Frontend Engineer'
+period: '2026.04 — 2026.05'
+product: 'MeetMate (Web)'
+implementation: ai-paired
+stack:
+  - lib-jitsi-meet (`setEffect`)
+  - TFLite WASM
+  - Web Audio API
+  - three.js + @pixiv/three-vrm
+  - kalidokit
+  - Vitest
+highlights:
+  - '가상 배경 7 모드와 음성 변조 6 preset을 v3 parity로 복원. 호스트 컨트롤이 OFF에서 라이브 사용 가능 상태로.'
+  - '신규 테스트 32건 추가, 전체 1,558건 통과. FSD 경계 위반 0 유지하며 머지.'
+  - '1.6MB TFLite wasm을 별도 fetch로 분리. dist 1.3MB gzip 번들 예산 외부로 빼내어 빌드 가드 통과.'
+  - '어댑터 경계에서만 통합. 알고리즘은 그대로 두고 모드 선택과 트랙 적용만 끊어 회귀 없이 6/7 preset 확장.'
+  - '운영 fix 4건으로 마무리. CSP, WASM SPA fallback, VRM 초기화 race를 결정적으로 차단.'
+order: 4
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+v4 초기 빌드에서 가상 배경과 음성 변조 UI는 토글만 동작했고, 실제 미디어 변환은 wiring되지 않은 상태였습니다. 호스트 컨트롤은 "찍기만 되는 stub"으로 남아 있었습니다.
+
+v3에는 검증된 파이프라인이 있었지만 단일 boolean과 chipmunk 단일 pitch 모드라, v4의 6 preset UI(male / female / robot / helium / deep / none)와 mismatch였습니다. 단순 복사가 아니라 *경계를 다시 그리는 포팅*이 필요했습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  v3 알고리즘을 그대로 모듈화해서 옮겼습니다. 음성 변조는 ScriptProcessor 순환버퍼 + 보간 + biquad 필터 + wet/dry 구조를 보존한 채, 모드 결정만 preset 테이블로 외부화했습니다.
+</RevealOnScroll>
+
+6개 preset은 각각 다른 변조 파라미터를 가집니다 — 남성(-4 semitone) · 여성(+4) · 로봇(-2 + 30Hz ring modulation) · 헬륨(+8) · 저음(-8) · 패스스루.
+
+가상 배경은 v3의 검증된 파이프라인을 그대로 옮겼습니다 — 30fps 타이머 워커 → 오프스크린 비디오 → TFLite WASM 추론 → 마스크 렌더링. 7 모드(블러 · 반블러 · 이미지 · 아바타 블러 · VRM 아바타 등)의 parity를 복원했고, VRM 3D 아바타는 `@pixiv/three-vrm` + `kalidokit`로 얼굴 landmark를 받아 표정을 매핑합니다.
+
+> 통합은 어댑터 경계에서만 합니다. 두 메서드(음성 preset 적용 / 가상 배경 적용)가 정책 결과를 트랙에 적용하고, 마이크나 카메라가 꺼져 있으면 warn 후 graceful return.
+
+운영에서 나온 이슈들은 별도 fix 커밋으로 끝까지 닫았습니다. CSP 헤더에 `worker-src blob:`이 빠져 워커가 막히던 문제, WASM 로더가 SPA fallback과 충돌해 404 나던 문제, Canvas `willReadFrequently` 힌트 누락, VRM 초기화 race를 ready flag로 결정적으로 차단.
+
+## 결과
+
+- 신규 테스트 +32건, 전체 1,558건 통과. typecheck clean, FSD 경계 위반 0 유지하며 머지.
+- WebSocket broadcast 호환은 유지하면서 실 미디어 변환은 로컬 트랙에서 완결.
+- TFLite 첫 로드(1.6MB wasm + 245KB 모델)는 직접 fetch로 분리해 dist 번들 예산 1.3MB gzip 바깥으로 빼냄.
+- 가상 배경 7 모드 + 음성 6 preset v3 parity 확인 → 호스트가 라이브 회의에서 사용 가능.
+
+## 배운 점
+
+검증된 파이프라인을 옮길 때는 *알고리즘을 그대로 두고 경계만 다시 그리는 게* 가장 안전했습니다. 핵심 신호 처리 부분은 손대지 않고 모드 선택과 트랙 적용만 어댑터에서 끊는 식으로 정리하니, 회귀를 만들지 않고도 6/7 preset 확장이 자연스럽게 들어왔습니다.
+
+또 한 가지: *번들 예산 바깥에 둘 자산을 의식적으로 골라내는 일*이 의외로 중요했습니다. 1.6MB wasm을 번들에 끼우면 예산이 즉시 깨지지만, 외부 fetch로 빼면 SPA fallback과 충돌합니다. 그 사이의 작은 운영 이슈들을 fix 커밋으로 끝까지 닫는 게 결국 "쓰이는 기능"과 "꺼져 있는 토글"을 가르는 분수령이었습니다.

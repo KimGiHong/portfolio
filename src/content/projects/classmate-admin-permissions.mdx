@@ -1,0 +1,60 @@
+---
+title: 'SaaS 4-tier 버전 × 3 서비스 권한 매트릭스 백오피스'
+summary: 'Free · Basic · Premium · Enterprise 4 버전 × Q&A · 커뮤니티 · 컨퍼런스 3 서비스 × N capability × 4-way 생성자 권한을 한 화면에서 편집하는 백오피스를, 팀 안에서 관리자 페이지 영역을 담당해 회사 페이지네이션·검색·throttle 업데이트까지 설계·구현했습니다 (백엔드는 별도 팀원 담당).'
+teaser: '4 버전 × 3 서비스 × ~200 권한 노드, 단일 화면 cascade 편집'
+role: 'Frontend Engineer (팀)'
+period: '2023.08 — 2023.12'
+product: 'ClassMate (Web)'
+implementation: hand-written
+stack:
+  - React 18
+  - Redux Toolkit
+  - axios
+  - i18next
+  - TypeScript
+highlights:
+  - '4 버전 × 3 서비스 × 평균 6 capability × 4-way creator-role = **편집 가능 권한 노드 ~200개**를 단일 페이지 cascade 편집.'
+  - '권한을 service → capability → creator의 **3-depth 트리**로 모델링, enable 토글이 하위 capability를 cascade disable.'
+  - '4-way 생성자 권한(all / host / member / none) mutual-exclusion을 `creatorKeys` 순회 1개 함수로 일반화.'
+  - '회사 리스트 무한 갱신을 Map 머지 + 시간 역정렬로 서버 페이지·실시간 갱신을 동일 코드 경로에 흡수, throttle 1s.'
+  - '메뉴·회사·사용자 3개 관리 페이지 합산 **약 1.5k LOC, 팀 안에서 관리자 영역 담당**.'
+order: 17
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+ClassMate는 SaaS로 운영되는 LMS 제품이라, 영업·운영팀이 회사별로 어떤 모듈을 켜고 어떤 역할이 무엇을 만들 수 있는지(예: 게시글 생성을 호스트에만 허용)를 직접 조정해야 했습니다. 기존엔 DB 직조작 또는 빈약한 토글 UI에 머물러 있었고, 새 회사를 등록할 때마다 운영팀이 BE 엔지니어를 거쳐야 했습니다.
+
+핵심은 *권한이 단순 boolean이 아니었다*는 점입니다. 한 capability(예: "게시글 생성")는 4-way 생성자 권한(all / host / member / none) 중 하나를 가질 수 있고, capability 묶음은 service 단위로 켜지거나 꺼지며, service 묶음은 다시 버전(Free/Basic/Premium/Enterprise)으로 묶입니다. 3-depth 트리 모델링이 필요한 도메인이었습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  권한을 **service → capability → creator의 3-depth 트리**로 모델링했습니다. 한 화면에서 enable 토글이 하위 capability를 자동으로 cascade disable, 4-way 라디오 그룹은 mutual-exclusion. 회사 선택 시 서버 권한 → 로컬 settings 디핑 로딩까지 단일 reducer-less local state로 처리했습니다.
+</RevealOnScroll>
+
+4-way 생성자 권한 mutual-exclusion 로직은 `creatorKeys` 순회 함수 하나로 일반화했습니다. 라디오 그룹마다 분기를 작성하지 않고, 키 배열만 정의하면 자동으로 mutual-exclusion이 적용됩니다. 새 권한 타입이 추가돼도 키 배열만 추가하면 됩니다.
+
+> 권한 UI는 *분기를 줄이는 게 곧 정확성*이었습니다. 분기가 많으면 영업팀의 미세 조정 요청이 들어올 때마다 if문이 늘어나고, 늘어난 if문이 새 회귀를 만듭니다.
+
+회사 리스트는 throttle 1s + ID Map 머지로 일괄 갱신, 페이지네이션 표시 윈도우 10페이지, 검색은 enter throttle. 회사 선택 시 권한 즉시 로드. 적용은 회사 ID + settings 스냅샷 1회 요청으로 끝나도록 API 표면을 단일화했습니다 — 회사 단위 트랜잭션이 명확해야 부분 적용 회귀가 없습니다.
+
+버전(예: Free)에서 비활성 모듈을 alert로 막아 영업 규칙을 UI 레벨에서 강제했습니다. *운영팀이 잘못 켜는 것까지 가드*하는 게 백오피스의 책임이라고 봤습니다.
+
+## 결과
+
+- 권한 노드 **~200개**(4 버전 × 3 서비스 × 평균 6 capability × 4-way creator)를 단일 화면에서 처리.
+- 3-depth 트리 모델 → enable 토글 cascade로 *부분 활성 회귀* 표면 0.
+- 4-way mutual-exclusion 일반화 — 새 권한 추가 시 코드 변경 0줄, 키 배열만 추가.
+- 회사 리스트 throttle **1s** + ID Map 머지, 페이지네이션 윈도우 10페이지.
+- 메뉴·회사·사용자 3개 관리 페이지 합산 **약 1.5k LOC, 5개월 ~40 커밋, 팀 안에서 관리자 영역 담당**.
+
+## 배운 점
+
+가장 큰 교훈은 *권한 도메인은 데이터 모델이 곧 UI*라는 점이었습니다. 3-depth 트리(service → capability → creator)로 모델링하면 cascade 토글 · mutual-exclusion · 일괄 적용이 모두 데이터 구조에서 자연히 떨어집니다. 모델이 평탄하면 UI에 분기가 쌓이고, 모델이 트리면 UI는 재귀 한 번으로 끝납니다.
+
+또 한 가지: *영업·운영팀이 잘못 설정하는 것까지 백오피스가 가드*해야 한다는 책임감. Free 버전에서 비활성 모듈을 alert로 막거나, capability를 4-way mutual-exclusion으로 강제하는 작은 가드들이 운영팀의 미세 조정 사이클을 BE 엔지니어 손에서 *완전히 떼어내는* 일이었습니다.

@@ -1,0 +1,53 @@
+---
+/**
+ * SectionTitle
+ * Editorial section heading: tiny mono kicker with a 1em maple accent stroke,
+ * followed by a balanced display heading. Heading level is configurable so
+ * pages can keep proper document outline (h1 once per page, h2 for sections).
+ */
+
+type Level = 1 | 2 | 3;
+
+interface Props {
+  kicker?: string;
+  level?: Level;
+  class?: string;
+}
+
+const { kicker, level = 2, class: className = '' } = Astro.props;
+const Tag = `h${level}` as 'h1' | 'h2' | 'h3';
+
+const sizeByLevel: Record<Level, string> = {
+  1: 'text-5xl sm:text-6xl',
+  2: 'text-3xl sm:text-4xl',
+  3: 'text-2xl',
+};
+---
+
+<div class:list={['flex flex-col gap-3', className]}>
+  {
+    kicker && (
+      <div class="flex items-center gap-2 text-ink-subtle">
+        <span aria-hidden="true" class="block h-px w-[1em] bg-accent-maple/70" />
+        <span class="font-mono text-[11px] tracking-[0.18em] uppercase">{kicker}</span>
+      </div>
+    )
+  }
+  <Tag
+    class:list={[
+      sizeByLevel[level],
+      'font-display text-ink-primary text-balance leading-[1.15]',
+    ]}
+  >
+    <slot />
+  </Tag>
+</div>
+
+<style>
+  /* Korean text uses the matching display serif. */
+  :global(:lang(ko)) h1,
+  :global(:lang(ko)) h2,
+  :global(:lang(ko)) h3 {
+    font-family: var(--font-display-ko), var(--font-display);
+  }
+</style>

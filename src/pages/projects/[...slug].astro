@@ -1,0 +1,202 @@
+---
+import { getCollection, render } from 'astro:content';
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import Chip from '@/components/ui/Chip.astro';
+import Divider from '@/components/ui/Divider.astro';
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+import HeadlineMetric from '@/components/effects/HeadlineMetric.tsx';
+import InkLink from '@/components/effects/InkLink.astro';
+
+export const getStaticPaths = (async () => {
+  const projects = await getCollection('projects', ({ data }) => !data.draft);
+  return projects.map((project) => ({
+    params: { slug: project.id },
+    props: { project },
+  }));
+}) satisfies GetStaticPaths;
+
+const { project } = Astro.props;
+const { Content } = await render(project);
+const { data } = project;
+
+const allProjects = (await getCollection('projects', ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order,
+);
+const currentIndex = allProjects.findIndex((p) => p.id === project.id);
+const prev = currentIndex > 0 ? allProjects[currentIndex - 1] : null;
+const next =
+  currentIndex >= 0 && currentIndex < allProjects.length - 1
+    ? allProjects[currentIndex + 1]
+    : null;
+---
+
+<BaseLayout title={`${data.title} — Evan Kim`} description={data.summary}>
+  <Container size="default" class="pt-24 pb-12 sm:pt-32">
+    <RevealOnScroll client:load>
+      <div class="flex items-center gap-2 text-ink-subtle">
+        <span aria-hidden="true" class="block h-px w-[1em] bg-accent-maple/70"></span>
+        <span class="font-mono text-[11px] tracking-[0.18em] uppercase">
+          Case Study · {String(data.order).padStart(2, '0')}
+        </span>
+      </div>
+    </RevealOnScroll>
+
+    <RevealOnScroll client:load delay={0.05}>
+      <h1
+        class="mt-5 text-4xl sm:text-5xl text-ink-primary text-balance leading-[1.1]"
+      >
+        {data.title}
+      </h1>
+    </RevealOnScroll>
+
+    <RevealOnScroll client:load delay={0.1}>
+      <p class="mt-6 text-xl text-ink-body leading-[1.6] max-w-[58ch]">
+        {data.summary}
+      </p>
+    </RevealOnScroll>
+
+    {data.headlineMetric && (
+      <div class="mt-10 max-w-[64ch]">
+        <HeadlineMetric
+          client:visible
+          label={data.headlineMetric.label}
+          before={data.headlineMetric.before}
+          after={data.headlineMetric.after}
+          unit={data.headlineMetric.unit}
+        />
+      </div>
+    )}
+
+    <RevealOnScroll client:load delay={0.15}>
+      <dl class="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-5 text-sm">
+        <div>
+          <dt class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle">
+            Product
+          </dt>
+          <dd class="mt-1 text-ink-body">{data.product}</dd>
+        </div>
+        <div>
+          <dt class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle">
+            Role
+          </dt>
+          <dd class="mt-1 text-ink-body">{data.role}</dd>
+        </div>
+        <div>
+          <dt class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle">
+            Period
+          </dt>
+          <dd class="mt-1 text-ink-body">{data.period}</dd>
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <dt class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle">
+            Stack
+          </dt>
+          <dd class="mt-1.5 flex flex-wrap gap-1.5">
+            {data.stack.slice(0, 4).map((s) => <Chip>{s}</Chip>)}
+          </dd>
+        </div>
+      </dl>
+
+      <div class="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-ink-subtle">
+        <span class="font-mono tracking-[0.18em] uppercase">Implementation</span>
+        <span aria-hidden="true">·</span>
+        <span class="text-ink-muted">
+          {data.implementation === 'hand-written' && 'Hand-written (pre-AI era, 2023)'}
+          {data.implementation === 'ai-paired' && 'AI-paired (Claude agent)'}
+          {data.implementation === 'mixed' && 'Hybrid (handover era — hand-written → AI-paired)'}
+        </span>
+      </div>
+
+      {
+        data.links && (Object.values(data.links).some(Boolean)) && (
+          <div class="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            {data.links.live && (
+              <InkLink href={data.links.live} external>
+                Live →
+              </InkLink>
+            )}
+            {data.links.repo && (
+              <InkLink href={data.links.repo} external>
+                Repository →
+              </InkLink>
+            )}
+            {data.links.case && (
+              <InkLink href={data.links.case} external>
+                Detailed Write-up →
+              </InkLink>
+            )}
+          </div>
+        )
+      }
+    </RevealOnScroll>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-16">
+    {
+      data.highlights.length > 0 && (
+        <RevealOnScroll client:visible>
+          <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4 mb-16">
+            {data.highlights.map((h) => (
+              <li class="flex gap-3 text-ink-body leading-[1.6]">
+                <span
+                  aria-hidden="true"
+                  class="mt-2 block h-1 w-1 shrink-0 rounded-full bg-accent-maple"
+                />
+                <span>{h}</span>
+              </li>
+            ))}
+          </ul>
+        </RevealOnScroll>
+      )
+    }
+
+    <article class="prose-paper" lang="ko">
+      <Content />
+    </article>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-20">
+    <nav
+      aria-label="Project navigation"
+      class="flex flex-col sm:flex-row sm:justify-between gap-8"
+    >
+      {
+        prev ? (
+          <a href={`/projects/${prev.id}`} class="group flex flex-col gap-1 outline-none">
+            <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle">
+              ← Previous
+            </span>
+            <span class="text-lg text-ink-primary transition-colors group-hover:text-accent-maple">
+              {prev.data.title}
+            </span>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        next ? (
+          <a
+            href={`/projects/${next.id}`}
+            class="group flex flex-col gap-1 sm:items-end sm:text-right outline-none"
+          >
+            <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle">
+              Next →
+            </span>
+            <span class="text-lg text-ink-primary transition-colors group-hover:text-accent-maple">
+              {next.data.title}
+            </span>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+    </nav>
+  </Container>
+</BaseLayout>

@@ -1,0 +1,244 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import SectionTitle from '@/components/ui/SectionTitle.astro';
+import Chip from '@/components/ui/Chip.astro';
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+import { profile } from '@/content/profile';
+
+const projects = (await getCollection('projects', ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order,
+);
+
+interface ProductMeta {
+  anchor: string;
+  productName: string;
+  platformLabelKo: string;
+  shortLabel: string;
+  tagline: string;
+  stack: string[];
+}
+
+const productMeta: Record<string, ProductMeta> = {
+  'MeetMate (Web)': {
+    anchor: 'meetmate-web',
+    productName: 'MeetMate',
+    platformLabelKo: '웹',
+    shortLabel: 'MeetMate · Web',
+    tagline:
+      'B2B 다자간 화상회의 플랫폼의 웹 클라이언트. 2026년 레거시 RN+Electron 모노레포에서 분기한 신규 React 19 SPA(v4)를 프론트엔드 단독으로 재구축해, 한 달 만에 로그인부터 호스트 기능 7배치까지 완주했습니다 (백엔드는 별도 팀원 담당).',
+    stack: ['React 19', 'Vite + SWC', 'Zustand', 'TanStack Query', 'lib-jitsi-meet', 'Jenkins'],
+  },
+  'MeetMate (Mobile)': {
+    anchor: 'meetmate-mobile',
+    productName: 'MeetMate',
+    platformLabelKo: '모바일 · iOS + Android',
+    shortLabel: 'MeetMate · Mobile',
+    tagline:
+      '같은 화상회의 플랫폼의 모바일 앱. React Native 0.77로 구현됐고, 100명 회의 성능부터 iOS 릴리즈 자동화, 테스트 인프라 도입까지 프론트엔드 단독으로 책임집니다 (백엔드는 별도 팀원 담당).',
+    stack: ['React Native 0.77', 'Zustand', 'lib-jitsi-meet', 'react-native-webrtc', 'Jest'],
+  },
+  'ClassMate (Web)': {
+    anchor: 'classmate',
+    productName: 'ClassMate',
+    platformLabelKo: '교육·LMS 도메인 · 웹',
+    shortLabel: 'ClassMate',
+    tagline:
+      'MeetMate 화상회의 코어를 교육·LMS 도메인으로 분기한 React 웹 제품. 2023년 팀의 한 사람으로 코치-코치이 Q&A · 커뮤니티 · 컨퍼런스 · 알림 · 4-tier 백오피스 영역에서 특정 기능을 담당했습니다 (전체 단독 아님, 동료들과 공동 개발 + 백엔드는 별도 팀원).',
+    stack: ['React 18', 'Redux Toolkit', 'jitsi-js-utils', 'react-konva', 'webpack', 'i18next'],
+  },
+  'NMS (Web)': {
+    anchor: 'nms',
+    productName: 'NMS',
+    platformLabelKo: '네트워크 관리 시스템 · 웹',
+    shortLabel: 'NMS · Web',
+    tagline:
+      'B2B 네트워크 관리 시스템의 웹 클라이언트. Next.js 14 App Router 기반 멀티테넌트 제품으로, 초기 빌드아웃 인계 후 2년간 프론트엔드 단독으로 발전·유지하며 RBAC 권한 시스템과 데이터 로딩 아키텍처를 재설계했습니다 (백엔드는 별도 팀원 담당).',
+    stack: ['Next.js 14', 'TanStack Query', 'TypeScript', 'Emotion + MUI', 'Chart.js'],
+  },
+  'CBR': {
+    anchor: 'cbr',
+    productName: 'CBR',
+    platformLabelKo: 'RAG 사례 챗봇 · 풀스택 단기',
+    shortLabel: 'CBR',
+    tagline:
+      'RAG 기반 사례 챗봇. 2025년 7-8월 7주간 팀의 한 사람으로 참여해, SSE 다단계 스트리밍 파이프라인과 라우트 이탈에도 끊기지 않는 상태 수명 관리(StreamManager)를 담당했습니다. 백엔드는 다른 분이 시작한 FastAPI + LangChain + Qdrant 코드 위에 SSE 엔드포인트 등을 AI agent와 함께 확장했습니다 (전체 풀스택 단독 아님).',
+    stack: ['Next.js 15', 'React 19', 'FastAPI', 'LangChain', 'Qdrant', 'TanStack Query'],
+  },
+};
+
+const groupOrder = [
+  'MeetMate (Web)',
+  'MeetMate (Mobile)',
+  'ClassMate (Web)',
+  'NMS (Web)',
+  'CBR',
+];
+const groups = groupOrder
+  .map((product) => ({
+    product,
+    meta: productMeta[product],
+    items: projects.filter((p) => p.data.product === product),
+  }))
+  .filter((g) => g.items.length > 0);
+---
+
+<BaseLayout
+  title={`Projects — ${profile.name.en}`}
+  description={profile.tagline.ko}
+>
+  <Container size="wide" class="pt-24 pb-6 sm:pt-32">
+    <RevealOnScroll client:load>
+      <SectionTitle kicker="Projects" level={1}>작업</SectionTitle>
+    </RevealOnScroll>
+    <RevealOnScroll client:load delay={0.05}>
+      <p class="mt-8 max-w-[60ch] text-lg text-ink-body leading-[1.7]" lang="ko">
+        제품마다 자기 챕터를 갖습니다. 각 챕터는 제품 맥락 한 단락과 그 안에서 다룬 사례 목록으로 펼쳐지고, 사례 제목을 누르면 본문으로 이어집니다.
+      </p>
+    </RevealOnScroll>
+    <RevealOnScroll client:load delay={0.1}>
+      <p class="mt-4 max-w-[60ch] text-sm text-ink-muted leading-[1.6]" lang="ko">
+        모두 사내 프로젝트로 소스 코드는 NDA에 의해 비공개입니다. 2024년 중반 이후 작업은 Claude AI agent와의 페어 프로그래밍으로 구현되며 본인이 아키텍처·리뷰·검증을 담당했습니다 (각 케이스 상세 페이지에 implementation 표기). ClassMate(2023)는 AI 도입 전 hand-written 시기의 작업입니다. 구체적인 구현·메트릭·디버깅 과정은 인터뷰에서 자세히 공유드릴 수 있습니다.
+      </p>
+    </RevealOnScroll>
+  </Container>
+
+  <Container size="wide" class="pb-12">
+    <RevealOnScroll client:load delay={0.15}>
+      <nav
+        aria-label="Project chapters"
+        class="flex flex-wrap items-center gap-x-6 gap-y-2 pt-8 border-t border-border-soft"
+      >
+        <span class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-subtle">
+          Chapters
+        </span>
+        {
+          groups.map((g, i) => (
+            <a
+              href={`#${g.meta.anchor}`}
+              class="inline-flex items-baseline gap-2 text-sm text-ink-muted hover:text-accent-maple transition-colors"
+            >
+              <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span class="font-mono text-[11px] tracking-[0.18em] uppercase">
+                {g.meta.shortLabel}
+              </span>
+              <span class="text-ink-subtle">· {String(g.items.length).padStart(2, '0')}</span>
+            </a>
+          ))
+        }
+      </nav>
+    </RevealOnScroll>
+  </Container>
+
+  <Container size="wide" class="pb-32">
+    <div class="flex flex-col gap-10 sm:gap-14">
+      {
+        groups.map((group, gIdx) => (
+          <RevealOnScroll client:visible>
+            <section
+              id={group.meta.anchor}
+              aria-labelledby={`heading-${group.meta.anchor}`}
+              class="scroll-mt-24"
+            >
+              <article class="relative overflow-hidden rounded-2xl border border-border-soft bg-paper-aged/30 px-6 py-10 sm:px-10 lg:px-14 sm:py-14 lg:py-16">
+                {/* Watermark chapter number — large display italic, soft maple wash */}
+                <span
+                  aria-hidden="true"
+                  class="absolute -top-4 right-4 sm:top-2 sm:right-10 lg:right-14 font-display italic font-light text-[8rem] sm:text-[12rem] lg:text-[14rem] leading-none text-accent-maple/[0.07] select-none pointer-events-none"
+                >
+                  {String(gIdx + 1).padStart(2, '0')}
+                </span>
+
+                <div class="relative grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-12 lg:gap-16">
+                  {/* Left column — product meta */}
+                  <header class="md:col-span-5 flex flex-col gap-6">
+                    <div class="flex items-center gap-2.5">
+                      <span aria-hidden="true" class="block h-[2px] w-6 bg-accent-maple" />
+                      <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-ink-subtle">
+                        Chapter {String(gIdx + 1).padStart(2, '0')} · {group.meta.shortLabel}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h2
+                        id={`heading-${group.meta.anchor}`}
+                        class="font-display italic font-light text-4xl sm:text-5xl lg:text-6xl text-ink-primary leading-[1.05]"
+                      >
+                        {group.meta.productName}
+                      </h2>
+                      <p
+                        class="mt-3 font-display-ko text-lg sm:text-xl text-ink-muted"
+                        lang="ko"
+                      >
+                        {group.meta.platformLabelKo}
+                      </p>
+                    </div>
+
+                    <p
+                      class="text-[1rem] sm:text-[1.05rem] text-ink-body leading-[1.75] max-w-[44ch]"
+                      lang="ko"
+                    >
+                      {group.meta.tagline}
+                    </p>
+
+                    <div class="flex flex-wrap gap-1.5">
+                      {group.meta.stack.map((s) => (
+                        <Chip>{s}</Chip>
+                      ))}
+                    </div>
+                  </header>
+
+                  {/* Right column — cases TOC */}
+                  <div class="md:col-span-7 flex flex-col gap-3">
+                    <div class="flex items-baseline justify-between pb-1">
+                      <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-ink-subtle">
+                        Cases
+                      </span>
+                      <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle">
+                        {String(group.items.length).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <ul class="flex flex-col divide-y divide-border-soft border-y border-border-soft">
+                      {group.items.map((p, i) => (
+                        <li>
+                          <a
+                            href={`/projects/${p.id}`}
+                            class="group grid grid-cols-[1.75rem_1fr_1rem] gap-3 sm:gap-5 py-4 sm:py-5 items-start outline-none"
+                          >
+                            <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle pt-[0.2rem]">
+                              {String(i + 1).padStart(2, '0')}
+                            </span>
+                            <div class="flex flex-col gap-1.5 min-w-0">
+                              <h3 class="text-base sm:text-[1.05rem] text-ink-primary leading-snug">
+                                <span class="bg-[linear-gradient(var(--color-accent-maple),var(--color-accent-maple))] bg-[length:0%_1px] bg-no-repeat bg-[position:0_100%] transition-[background-size] duration-500 ease-out group-hover:bg-[length:100%_1px]">
+                                  {p.data.title}
+                                </span>
+                              </h3>
+                              <p class="text-[0.85rem] sm:text-sm text-ink-muted leading-[1.55]">
+                                {p.data.teaser}
+                              </p>
+                            </div>
+                            <span
+                              aria-hidden="true"
+                              class="font-mono text-[12px] text-ink-muted transition-all duration-300 group-hover:text-accent-maple group-hover:translate-x-0.5 self-center"
+                            >
+                              →
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </article>
+            </section>
+          </RevealOnScroll>
+        ))
+      }
+    </div>
+  </Container>
+</BaseLayout>

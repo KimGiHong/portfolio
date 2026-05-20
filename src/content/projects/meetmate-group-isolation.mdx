@@ -1,0 +1,58 @@
+---
+title: '소그룹 영상·음성 가시성 단일 진실 소스 — 비대칭 회귀를 컴파일 단위로 차단'
+summary: '비디오 그리드와 WebRTC 오디오 게이팅이 서로 다른 코드 경로에서 같은 가시성을 표현해 "보이는데 안 들리거나, 안 보이는데 들리는" 비대칭 회귀가 반복되던 상황을, 둘이 같은 pure function 한 곳만 통과해야 노출되도록 단일 진실 소스로 통합했습니다.'
+teaser: '단일 predicate가 비디오/오디오 통합 — 비대칭 회귀 컴파일 단위 차단'
+role: 'Frontend Lead'
+period: '2026.04 — 2026.05'
+product: 'MeetMate (Web)'
+implementation: ai-paired
+stack:
+  - React 19
+  - TypeScript
+  - Zustand
+  - lib-jitsi-meet
+  - Feature-Sliced Design
+highlights:
+  - '비디오 그리드와 원격 오디오 트랙 게이팅이 같은 가시성 predicate 통과. 보이는 것 ↔ 들리는 것 비대칭 회귀 표면 0.'
+  - '격리 모드 진입 조건은 활성 그룹 ≥1 단일 조건. host 특례 없이 동일 규칙 적용.'
+  - '원격 오디오는 `MediaStreamTrack.enabled=false`로 브라우저 레벨 mute. WebRTC 재협상 0회, mic 아이콘 상태 변화 0.'
+  - '본인 트랙은 endpoint 일치 검사로 명시 skip. 사용자의 mic 토글 권위 보존.'
+  - '회귀 테스트 4종 (로비 호스트 ↔ 그룹 내 / 그룹 A ↔ 그룹 B 멤버 / 본인 mute 권위 / 로비 복귀 unmute).'
+order: 3
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+소그룹(브레이크아웃) 활성 중 로비에 남은 호스트의 영상이 그룹 안 참가자에게 그대로 보이고, 그룹 안 멤버의 화면이 호스트에게 노출되는 회귀가 반복적으로 보고됐습니다. 비디오 레이아웃 필터와 원격 오디오 트랙 게이팅 코드가 분리돼 *동일한 가시성 의미*를 두 곳에서 따로 표현하고 있었고, 한쪽만 패치되면 즉시 비대칭 회귀가 발생하는 구조였습니다.
+
+문제는 "버그가 자주 난다"가 아니라 "같은 의미를 두 곳에서 표현하니 비대칭이 *구조적으로* 가능하다"는 점이었습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  가시성 판정을 `(member, { activeGroupId, groups })` 입력의 순수 함수 하나로 추출했습니다. 활성 그룹이 하나라도 있으면 격리 모드로 들어가고, 비디오 그리드 필터와 원격 오디오 트랙의 `MediaStreamTrack.enabled` 게이팅이 모두 이 predicate를 통과해야만 노출되도록 강제했습니다.
+</RevealOnScroll>
+
+본인 트랙은 endpoint 일치 검사로 명시적으로 skip해 사용자의 mic 토글 권위를 보존했습니다. 게이팅이 local enabled를 덮어쓰면 lib-jitsi-meet의 `isMuted()` early-return으로 XMPP presence 미발송 회귀가 났던 사례를 명시적으로 차단한 결정입니다.
+
+> 비디오와 오디오를 따로 보지 않습니다. 같은 predicate 결과를 양쪽에 적용하면 비대칭은 표면적으로 불가능해집니다.
+
+Zustand `subscribeWithSelector`로 그룹/멤버 변화에만 idempotent하게 재적용되도록 묶었습니다. 활성 그룹이 0개로 돌아오면 게이팅 set을 `null` 반환 — 전체 unmute가 한 줄로 처리되어 로비 복귀 시 별도 핸들링 불필요.
+
+## 결과
+
+- 가시성 predicate **1개**가 비디오/오디오 양쪽 진입점에서 호출 — 비대칭 회귀 표면 0.
+- 격리 모드는 활성 그룹 ≥1 단일 조건, role 특례 없음.
+- 원격 오디오 게이팅은 브라우저 레벨 `enabled=false` — WebRTC 재협상 **0회**.
+- 본인 mic 토글 권위 보존 — `isMuted()` early-return으로 인한 XMPP presence 미발송 회귀 해소.
+- 회귀 테스트 4종 추가 (로비/그룹 호스트, 다른 그룹 멤버, 본인 mute 권위, 로비 복귀 unmute).
+
+## 배운 점
+
+같은 의미를 두 곳에서 표현하면 한쪽이 늦거나 흔들릴 때 비대칭이 생긴다는 게 가장 직접적인 교훈이었습니다. 의미를 *한 곳에서 결정하고 양쪽에 적용*하는 구조는 if문을 추가하지 않아도 회귀가 컴파일 단위에서 닫힙니다.
+
+또 한 가지: WebRTC 트랙 제어와 도메인 가시성 의미는 *분리된 레이어*여야 했습니다. lib-jitsi-meet의 mute 메서드는 XMPP presence까지 영향을 주는 사용자 권위 행위인 반면, 그룹 격리는 브라우저 레벨의 시청각 차단입니다. 둘을 같은 메서드로 처리하면 권위가 흔들립니다 — `MediaStreamTrack.enabled`만 토글하고 SDK의 mute는 건드리지 않는 선택이 그 분리의 핵심이었습니다.

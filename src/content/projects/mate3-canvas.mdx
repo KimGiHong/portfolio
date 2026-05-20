@@ -1,0 +1,59 @@
+---
+title: '60fps 협업 캔버스 — RN에서 PDF·화이트보드·VOD 위 실시간 주석 직접 구현'
+summary: '웹은 Konva로 구현돼 있던 협업 주석 캔버스를 React Native에는 등가물이 없어 처음부터 다시 짰습니다. 60fps 손그림 + 7가지 도구 + 핀치 줌 + 라인 단위 실시간 전송 + 권한 기반 부분 지우기를 단일 컴포넌트 947줄로 통합했습니다.'
+teaser: '60fps SVG 캔버스 947줄, 7 도구 + 권한 기반 부분 지우기'
+role: 'Frontend Engineer'
+period: '2025.10 — 2026.01'
+product: 'MeetMate (Mobile)'
+implementation: ai-paired
+stack:
+  - React Native 0.77
+  - react-native-svg
+  - PanResponder
+  - requestAnimationFrame
+  - lib-jitsi-meet
+  - TypeScript
+highlights:
+  - 'PanResponder 핫패스에서 React state 대신 ref만 갱신, `requestAnimationFrame`으로 렌더 throttle. setState 폭주 차단.'
+  - '이전 점 대비 2px 미만 이동 시 새 점 버림 (`dx² + dy² < 4`). 한 획당 점 수 체감 1/3 수준으로 축소.'
+  - 'SVG `<ClipPath>`로 인플레이스 텍스트 편집 영역 잘림 처리 — RN에서 `overflow: hidden`이 SVG에 안 먹는 문제 우회.'
+  - '7가지 도구(펜 · 직선지우개 · 부분지우개 · 사각/원/삼각형 · 텍스트 · 핸들러) + 권한 기반 부분 지우기 + 라인 단위 서버 전송을 단일 947줄 컴포넌트로 통합.'
+  - '캔버스 좌표계와 화면 좌표계 분리 — 저장은 도큐먼트 좌표, 렌더는 `<G transform>`로 한 번에 변환.'
+order: 6
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+화상회의 화면 위에 PDF · 화이트보드 · 녹화 VOD를 띄우고 강사·참석자가 함께 펜 · 도형 · 텍스트로 주석을 다는 협업 캔버스가 필요했습니다. 웹은 Konva로 구현돼 있었지만 React Native에 Konva 등가물이 없었고, 60fps 손그림 + 핀치 줌 + 라인 단위 서버 전송 + 권한 기반 부분 지우기를 모두 한 화면에서 처리해야 했습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  `react-native-svg`로 처음부터 다시 짜되 터치 핫패스는 React state 대신 ref만 갱신하고 `requestAnimationFrame`으로 렌더를 throttle하는 구조를 택했습니다. React 렌더 사이클을 *경유하지 않는 제2의 흐름*을 같은 컴포넌트 안에 의식적으로 분리한 것이 60fps의 전제였습니다.
+</RevealOnScroll>
+
+펜은 이전 점 대비 2px 미만 이동 시 새 점을 버려 포인트 축적을 막고, 패닝은 별도 rAF로 분리해 그리기 rAF와 충돌하지 않게 했습니다. PanResponder는 항상 최신 콜백을 호출하도록 `useRef(callback) + useEffect` 동기화 패턴으로 stale closure를 차단했습니다.
+
+> 60fps 손그림은 setState로는 불가능합니다. ref와 rAF만 사용하면 React의 렌더 사이클을 피해 갈 수 있습니다.
+
+텍스트는 SVG `<ClipPath>`로 사각형 박스 안에서만 보이도록 잘랐습니다 — React Native에서 `overflow: hidden`이 SVG에 안 먹는 문제를 우회한 결정입니다. 도형 · 텍스트는 음수 드래그를 `flipX/flipY` 플래그로 처리해 어느 방향으로 그어도 동일하게 렌더되게 만들었고, 부분 지우개는 라인-점 거리 판정 후 본인 라인 또는 SHARE 권한 보유자만 삭제 가능하도록 권한을 인코딩했습니다.
+
+라인 전송은 store 저장 전에 단 한 번 발사하면서, `width`/`height`를 정수화하고 `undefined` 필드와 잉여 `points`를 제거해 페이로드 정합성을 보장했습니다.
+
+## 결과
+
+- 단일 컴포넌트 **947줄**에 7가지 도구 통합 (펜 / 직선지우개 / 부분지우개 / 사각·원·삼각형 / 텍스트 / 핸들러).
+- 포인트 컬링 임계값 **2px** — 한 획당 점 수 체감 1/3 수준 감소.
+- PanResponder stale closure 차단 — `useRef(callback) + useEffect` 동기화로 항상 최신 핸들러 호출.
+- 라인 전송 페이로드 정합성 — 정수화 + `undefined` 필드 제거 + 잉여 `points` 제거.
+- 텍스트 박스 최소 드래그 **20px** 임계 — 오터치 입력 모달 방지.
+
+## 배운 점
+
+React Native에서 60fps 그래픽을 다룰 때는 React의 렌더 사이클을 *경유하지 않는 경로*가 필요했습니다. PanResponder + ref + rAF 조합은 같은 컴포넌트 안에 있으면서도 React state 흐름과 분리된 *제2의 흐름*입니다. 둘을 의식적으로 갈라두지 않으면 60fps는 불가능합니다.
+
+또 한 가지: 캔버스 좌표계와 화면 좌표계를 *분리하는 결정*이 의외로 큰 차이를 만들었습니다. 저장은 원본 도큐먼트 좌표로, 렌더는 `<G transform="translate scale">` 한 번에 변환 — 줌이나 패닝 시 좌표 재계산이 필요 없고, 다른 디바이스에서 같은 라인이 같은 위치에 그대로 나타납니다.

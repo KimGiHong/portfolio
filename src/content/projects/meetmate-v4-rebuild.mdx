@@ -1,0 +1,73 @@
+---
+title: 'MeetMate Web v4 — 레거시 RN 모노레포에서 분기한 신규 SPA'
+summary: '운영 중단 없이 RN+Electron 모노레포에서 React 19 SPA를 분기, 프론트엔드 단독으로 한 달간 로그인부터 호스트 기능 7배치까지 도달했습니다. 마지막에는 회귀 가드 라운드를 통과시키고 v3 레거시 89,724 라인을 일괄 제거해 Web v4를 단일 타깃으로 완주했습니다 (백엔드는 별도 팀원 담당).'
+teaser: '한 달 230 커밋, FSD 위반 475 → 0, v3 89k 라인 일괄 제거'
+role: 'Frontend Lead'
+period: '2026.04 — 2026.05'
+product: 'MeetMate (Web)'
+implementation: ai-paired
+stack:
+  - React 19
+  - TypeScript
+  - Vite + SWC
+  - Turborepo
+  - Feature-Sliced Design
+  - Zustand
+  - TanStack Query
+  - Jenkins
+headlineMetric:
+  label: 'FSD 경계 위반 — CI 가드 적용 전후'
+  before: 475
+  after: 0
+  unit: '건'
+highlights:
+  - '마이그레이션 완주 — 회귀 가드 라운드(WebSocket 18 도메인 + 멤버 시드 5종 차단)를 통과시킨 뒤, v3 레거시 1,233 파일 / 89,724 라인을 같은 날 일괄 제거.'
+  - 'FSD 경계 위반 475건 → 0건. lefthook + CI 양쪽에서 강제해 같은 방식으로 다시 깨질 수 없게 잠금.'
+  - 'Vitest 1,943 케이스 + Playwright E2E. 프론트엔드 단독 한 달 230 커밋(+131k/−40k), 운영 중단 0회.'
+  - '1.3MB gzip 번들 예산, 5 테넌트 병렬 빌드, axe-core 회귀 baseline을 Jenkins 한 파이프라인에 묶음.'
+  - 'Redux 폐기 후 상태 유형별 4축으로 매핑. 실시간은 Zustand, 서버는 TanStack Query, 파생은 Jotai, 폼은 RHF+Zod.'
+order: 1
+featured: true
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+MeetMate는 React Native + Electron + Web을 한 코드베이스에서 운영하던 다자간 화상회의 플랫폼이었습니다. Redux와 글로벌 객체 위에 JS 파일 200개+가 쌓여 결합도가 높았고, 웹만 따로 빠르게 진화시키기 어려웠습니다. 새 기능을 넣을 때마다 모바일·일렉트론·웹 세 곳을 동시에 신경 써야 했습니다.
+
+문제는 단순한 코드 정리가 아니었습니다. 5개 테넌트 빌드는 멈출 수 없었고, v3의 사용 중인 화면을 픽셀 단위로 보존해야 했으며, 새 코드베이스가 다시 같은 방식으로 망가지지 않도록 경계를 어딘가에 박아야 했습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  먼저 **경계를 먼저 그리는 일**부터 시작했습니다. Turborepo + pnpm workspace로 v4를 격리하고, Feature-Sliced Design 6 레이어에 자체 가드 스크립트를 붙여 lefthook과 CI 양쪽에서 위반 import를 차단했습니다.
+</RevealOnScroll>
+
+상태는 유형별로 4축에 매핑했습니다. 실시간은 Zustand, 서버는 TanStack Query(suspense-first), 파생·UI는 Jotai, 폼은 React Hook Form + Zod. v3의 Redux `dispatch` 호출과 글로벌 API 객체는 새 store 액션과 `ky` HTTP 클라이언트로 기계적으로 교체했습니다.
+
+> UI는 한 픽셀도 바꾸지 않고 내부 코드만 옮긴다 — 이 원칙을 문서로 박아두고 PR마다 강제했습니다.
+
+Jitsi와 자체 WebSocket 도메인은 "불변 경계"로 격리하고, 어댑터 한 곳에서만 도메인 store에 사이드이펙트를 주입하도록 정리했습니다. Jenkins 파이프라인은 5 테넌트 병렬 빌드 + 1.3MB gzip 번들 예산 + axe-core 회귀 baseline 3 페이지를 한 단계 안에 묶었습니다.
+
+## 결과
+
+- 한 달간 단일 엔지니어로 230 커밋(+131k/−40k)을 v4에 집중. 운영 중단 0회.
+- 로그인 → 로비 → 디바이스 선택 → 룸 → 호스트 기능 7배치(알림 · 리액션 · E2EE · 녹화 · 화이트보드 · 설문 등)까지 도달.
+- FSD 경계 위반 475건 → 0건. Vitest 1,943 케이스 + Playwright E2E + axe-core 회귀 baseline 3 페이지.
+- 1.3MB gzip 번들 예산 CI 강제, 5 테넌트 빌드 매트릭스 자동화.
+
+## 완주
+
+마이그레이션의 마지막 라운드에서, WebSocket inbound 이벤트 18 도메인에 회귀 가드 테스트를 일괄 추가하고, 멤버 시드의 placeholder 부활 5종 케이스를 store 레벨 invariant로 차단했습니다. Mate와 Jitsi 두 세션의 라이프사이클은 단일 bridge 세션 개념으로 한 곳에서 시작·정리되도록 일원화했습니다.
+
+라운드가 통과한 뒤(typecheck clean · FSD 경계 위반 0 · Vitest 1,943 케이스 0 fail) 같은 날, 한 달 된 안전망 — v3 레거시 1,233 파일 / 89,724 라인 — 을 일괄 제거했습니다. RN 플랫폼 디렉터리, Electron, v3 React 원본, 그에 딸린 webpack/Babel/Metro 빌드 체인까지. Web v4가 단일 타깃이 됐습니다.
+
+> 한 달 된 안전망을 자신 있게 지운다는 건, 새 시스템에 대한 자기검증이기도 합니다.
+
+## 배운 점
+
+마이그레이션은 *코드를 옮기는 일이 아니라 결정을 옮기는 일*이었습니다. 어떤 상태가 어디에 살지, 어떤 import가 허용되는지, 어떤 번들 크기가 빨간 불인지 — 이 결정들을 PR 리뷰가 아니라 CI에 박아두는 순간부터 마이그레이션이 진짜로 끝나기 시작했습니다.
+
+또 한 가지: v3 UI를 강제로 보존하는 원칙은 처음에는 답답했지만, 결과적으로 *디자인 결정*과 *코드 결정*을 분리해서 한 번에 한 가지만 흔들 수 있게 만들었습니다. UI를 새로 그리는 것은 시스템이 안정된 다음 일이었습니다.

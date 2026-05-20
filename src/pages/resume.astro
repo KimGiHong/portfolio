@@ -1,0 +1,299 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import InkLink from '@/components/effects/InkLink.astro';
+import { profile } from '@/content/profile';
+
+// Curated for resume — one strong representative per product × diverse angles.
+// 1) Lead/scope flagship · 2) Hard-number perf · 3) System architecture
+// 4) AI-native full-stack · 5) Pre-AI hand-written fundamentals
+const RESUME_PROJECT_SLUGS = [
+  'meetmate-v4-rebuild',
+  'mate3-rn-performance',
+  'nms-rbac-permissions',
+  'cbr-rag-streaming',
+  'classmate-admin-permissions',
+];
+
+const allProjects = await getCollection('projects', ({ data }) => !data.draft);
+const projects = RESUME_PROJECT_SLUGS
+  .map((slug) => allProjects.find((p) => p.id === slug))
+  .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
+const today = new Date();
+const updated = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}`;
+---
+
+<BaseLayout
+  title={`Resume — ${profile.name.en}`}
+  description={`${profile.name.ko}의 이력서`}
+>
+  <Container size="default" class="pt-20 pb-12 sm:pt-28 print:pt-0 print:pb-0">
+    <div class="print:hidden flex items-center justify-between gap-4 mb-12">
+      <p class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle">
+        Resume · Updated {updated}
+      </p>
+      <button
+        type="button"
+        data-print
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-soft bg-paper-fiber/40 hover:bg-paper-fiber text-ink-body text-sm transition-colors outline-none focus-visible:bg-paper-fiber"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 6 2 18 2 18 9" />
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <rect x="6" y="14" width="12" height="8" />
+        </svg>
+        PDF로 저장
+      </button>
+    </div>
+
+    <header class="resume-header">
+      <h1 class="text-balance leading-[1.05] print:leading-[1.1]">
+        <span
+          class="block font-display italic font-light text-5xl sm:text-6xl print:text-[34pt] text-ink-primary"
+        >
+          {profile.name.en}
+        </span>
+        <span
+          class="block mt-2 font-display-ko text-2xl sm:text-3xl print:text-[16pt] text-ink-primary/85"
+          lang="ko"
+        >
+          {profile.name.ko}
+        </span>
+      </h1>
+
+      <div
+        class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm print:text-[10pt] text-ink-muted"
+      >
+        <span>{profile.title.ko}</span>
+        <span aria-hidden="true" class="text-ink-subtle">·</span>
+        <span>{profile.location}</span>
+        <span aria-hidden="true" class="text-ink-subtle">·</span>
+        <span class="print:hidden">
+          <InkLink href={`mailto:${profile.email}`}>{profile.email}</InkLink>
+        </span>
+        <span class="hidden print:inline">{profile.email}</span>
+      </div>
+
+      <p
+        class="mt-6 max-w-[56ch] text-lg print:text-[11pt] text-ink-body leading-[1.7] italic font-display font-light"
+      >
+        {profile.tagline.ko}
+      </p>
+    </header>
+
+    <hr class="my-10 print:my-6 h-px border-0 bg-border-soft" />
+
+    <section class="resume-section">
+      <h2 class="resume-heading">Summary</h2>
+      <div class="mt-4 flex flex-col gap-3 text-ink-body leading-[1.75] print:text-[10.5pt] print:leading-[1.55]" lang="ko">
+        {profile.about.ko.slice(0, 2).map((p) => <p>{p}</p>)}
+      </div>
+    </section>
+
+    <hr class="my-10 print:my-6 h-px border-0 bg-border-soft" />
+
+    <section class="resume-section">
+      <h2 class="resume-heading">Experience</h2>
+      <div class="mt-6 flex flex-col gap-10 print:gap-5">
+        {
+          profile.experience.map((job) => (
+            <article class="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-8 gap-y-2 print:grid-cols-[8rem_1fr] print:gap-x-6">
+              <div class="font-mono text-[11px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted pt-1">
+                {job.period}
+              </div>
+              <div class="flex flex-col gap-2 print:gap-1">
+                <h3 class="text-lg print:text-[11pt] text-ink-primary">
+                  {job.role} · <span class="text-ink-muted">{job.company}</span>
+                  <span class="text-ink-subtle text-sm print:text-[9pt] ml-2">{job.location}</span>
+                </h3>
+                <p class="text-ink-body leading-[1.7] print:text-[10pt] print:leading-[1.55]">
+                  {job.summary}
+                </p>
+                <ul class="mt-1 flex flex-col gap-1.5 print:gap-0.5">
+                  {job.achievements.map((a) => (
+                    <li class="flex gap-2.5 text-ink-body leading-[1.65] print:text-[10pt] print:leading-[1.5]">
+                      <span
+                        aria-hidden="true"
+                        class="mt-[0.65em] block h-1 w-1 shrink-0 rounded-full bg-accent-maple"
+                      />
+                      <span>{a}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs print:text-[9pt] text-ink-subtle font-mono">
+                  {job.stack.map((s) => (
+                    <span>{s}</span>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <hr class="my-10 print:my-6 h-px border-0 bg-border-soft" />
+
+    <section class="resume-section">
+      <h2 class="resume-heading">Selected Projects</h2>
+      <div class="mt-6 flex flex-col gap-6 print:gap-3">
+        {
+          projects.map((project) => (
+            <article class="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-8 gap-y-1 print:grid-cols-[8rem_1fr] print:gap-x-6">
+              <div class="font-mono text-[11px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted pt-1">
+                {project.data.period}
+              </div>
+              <div class="flex flex-col gap-1">
+                <h3 class="text-base print:text-[11pt] text-ink-primary">
+                  <a
+                    href={`/projects/${project.id}`}
+                    class="hover:text-accent-maple transition-colors print:text-ink-primary print:no-underline"
+                  >
+                    {project.data.title}
+                  </a>
+                </h3>
+                <div class="text-sm print:text-[9.5pt] text-ink-muted">
+                  <span class="text-ink-body">{project.data.product}</span>
+                  <span class="text-ink-subtle"> · {project.data.role}</span>
+                </div>
+                <p class="mt-1 text-ink-body leading-[1.6] print:text-[10pt] print:leading-[1.45]">
+                  {project.data.summary}
+                </p>
+                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs print:text-[9pt] text-ink-subtle font-mono">
+                  {project.data.stack.map((s) => (
+                    <span>{s}</span>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <hr class="my-10 print:my-6 h-px border-0 bg-border-soft" />
+
+    <section class="resume-section">
+      <h2 class="resume-heading">Skills</h2>
+      <dl class="mt-6 grid grid-cols-1 sm:grid-cols-[10rem_1fr] print:grid-cols-[8rem_1fr] gap-x-8 print:gap-x-6 gap-y-3 print:gap-y-1.5">
+        {
+          profile.skills.map((group) => (
+            <>
+              <dt class="font-mono text-[11px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted pt-1">
+                {group.group}
+              </dt>
+              <dd class="text-ink-body leading-[1.7] print:text-[10pt] print:leading-[1.5]">
+                {group.items.join(' · ')}
+              </dd>
+            </>
+          ))
+        }
+      </dl>
+    </section>
+
+    <hr class="my-10 print:my-6 h-px border-0 bg-border-soft" />
+
+    <section class="resume-section">
+      <h2 class="resume-heading">Education</h2>
+      <div class="mt-6 flex flex-col gap-4">
+        {
+          profile.education.map((edu) => (
+            <article class="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-8 print:gap-x-6 print:grid-cols-[8rem_1fr]">
+              <div class="font-mono text-[11px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted pt-1">
+                {edu.period}
+              </div>
+              <div class="text-ink-body print:text-[10.5pt]">
+                <span class="text-ink-primary">{edu.school}</span>
+                <span class="text-ink-muted"> · {edu.degree}</span>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <hr class="my-10 print:my-6 h-px border-0 bg-border-soft" />
+
+    <section class="resume-section">
+      <h2 class="resume-heading">Links</h2>
+      <ul class="mt-6 flex flex-col gap-2 text-ink-body print:text-[10pt]">
+        <li>
+          <span class="font-mono text-[10px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted mr-3">
+            Email
+          </span>
+          <span class="print:hidden">
+            <InkLink href={`mailto:${profile.email}`}>{profile.email}</InkLink>
+          </span>
+          <span class="hidden print:inline">{profile.email}</span>
+        </li>
+        <li>
+          <span class="font-mono text-[10px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted mr-3">
+            GitHub
+          </span>
+          <span class="print:hidden">
+            <InkLink href={profile.socials.github} external>
+              {profile.socials.github.replace('https://', '')}
+            </InkLink>
+          </span>
+          <span class="hidden print:inline">{profile.socials.github.replace('https://', '')}</span>
+        </li>
+        <li>
+          <span class="font-mono text-[10px] print:text-[9pt] tracking-[0.16em] uppercase text-ink-muted mr-3">
+            LinkedIn
+          </span>
+          <span class="print:hidden">
+            <InkLink href={profile.socials.linkedin} external>
+              {profile.socials.linkedin.replace('https://', '')}
+            </InkLink>
+          </span>
+          <span class="hidden print:inline">{profile.socials.linkedin.replace('https://', '')}</span>
+        </li>
+      </ul>
+    </section>
+  </Container>
+</BaseLayout>
+
+<style>
+  .resume-heading {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-ink-subtle);
+  }
+
+  @media print {
+    .resume-heading {
+      font-size: 9pt;
+      letter-spacing: 0.18em;
+      color: black;
+      break-after: avoid;
+    }
+
+    /* allow sections to flow across page boundaries — prevents
+       half-empty pages when a section can't fit on the remaining space.
+       individual articles/list items keep their no-break rule (in global.css). */
+  }
+</style>
+
+<script>
+  function bindPrint() {
+    const btn = document.querySelector<HTMLButtonElement>('[data-print]');
+    if (!btn) return;
+    btn.addEventListener('click', () => window.print());
+  }
+  bindPrint();
+  document.addEventListener('astro:after-swap', bindPrint);
+</script>

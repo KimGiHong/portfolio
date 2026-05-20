@@ -1,0 +1,65 @@
+---
+title: '50명 회의에서도 안 죽는 화상 그리드'
+summary: '50명 회의의 모바일 사용성을 회복했습니다. SFU 수신을 페이지 단위로 자르고, 화질 결정은 산발적 if문 대신 dpr·참가자 수·연결 품질을 입력으로 받는 단일 pure-function 모듈에서만 일어나도록 정리했습니다.'
+teaser: '디코딩 부하 50 → 25개, SFU 페이지 단위 수신 제어 + 화질 정책 단일 모듈'
+role: 'Frontend Engineer'
+period: '2026.04'
+product: 'MeetMate (Web)'
+implementation: ai-paired
+stack:
+  - lib-jitsi-meet
+  - VP9 simulcast
+  - Zustand
+  - Jotai
+  - Puppeteer
+  - React 19
+headlineMetric:
+  label: '50명 회의 모바일 디코딩 부하 — 페이지 단위 SFU 제어 적용 전후'
+  before: 50
+  after: 25
+  unit: '개'
+highlights:
+  - '50명 방 모바일 사용성 회복. 현재 페이지 외 참가자 SFU forward 차단으로 디코딩 부하 ~50개 → ~25개.'
+  - '화질 정책을 단일 pure-function 모듈로 통합. 입력 3종을 받아 해상도 헤드 버킷을 반환하는 구조로 if문 산재 종료.'
+  - 'Puppeteer fake-camera 봇을 자체 작성. burst/steady/churn 부하 p95 메트릭을 매 빌드 산출물로 외부 관찰.'
+  - '신규 회귀 테스트 20건+. 정책 변경 시 그래프로 회귀를 감지할 수 있는 상태로.'
+  - '백그라운드 탭 송수신 중단과 지수 백오프 재연결로 세션 복원성 확보.'
+order: 2
+featured: true
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+모든 참가자의 트랙을 동시에 받아 모바일·중사양 기기에서 50명 방이 사실상 불가능했습니다. CPU와 GPU가 한 번에 50개 디코딩을 감당하지 못했고, 모바일은 발열로 자동 꺼졌습니다.
+
+문제를 더 어렵게 만들었던 건 *화질 결정 로직이 어댑터 내부에 산재*해 있었다는 점이었습니다. 어디서 무슨 조건일 때 어느 해상도를 쓰는지 한 곳에 정리되어 있지 않으니, 튜닝할 때마다 if문이 늘어났고 회귀가 자주 났습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  먼저 **수신을 페이지 단위로 자르는 일**부터 했습니다. 페이지 상태를 store 한 곳에 단일화하고, `setReceiverConstraints` modern API를 어댑터에 추가해 현재 페이지 참가자만 고해상도로 받게 했습니다.
+</RevealOnScroll>
+
+송신은 별도의 pure-function 모듈로 분리했습니다. 세 함수(수신 해상도 · 송신 해상도 · 강등 해상도 계산)가 dpr · 참가자 수 · connection-quality를 입력으로 받아 해상도 버킷을 반환합니다. 정책은 모듈 한 곳에서 결정되고, 어댑터는 결과만 적용합니다.
+
+> 산발적 if문 대신 하나의 테스트 가능한 함수. 튜닝은 함수의 입력을 바꾸는 일이 되고, 회귀는 테스트에서 잡힙니다.
+
+화면 공유는 정책 바깥에서 별도 트랙(1080p / 10–15fps + `contentHint`)으로 흘렸습니다. 백그라운드 탭은 송수신 중단, 회선 복귀는 `navigator.onLine`과 지수 백오프 재연결로 묶었습니다.
+
+검증은 외부에서 관찰 가능해야 한다고 봤습니다. Puppeteer fake-camera 봇과 WebSocket 봇을 직접 작성해 6 · 17 · 25명+ 시나리오에서 burst · steady · churn 부하를 돌리고, simulcast 레이어와 `setReceiverConstraints` 적용 여부, p95 메트릭을 JSON으로 저장했습니다.
+
+## 결과
+
+- 50명 방 모바일 사용성 회복. 현재 페이지 외 참가자 SFU forward 차단.
+- VP9 우선 + VP8 폴백. 화면 공유 전용 1080p · 10–15fps.
+- 회귀 테스트 신규 20건+. 페이지 상태, 참가자 활성화, 화질 어댑터, VP9 / p2p off / bridge channel 가드.
+- 부하 봇 산출물로 simulcast 적용과 화질 정책 결과를 매 빌드마다 외부 관찰 가능.
+
+## 배운 점
+
+WebRTC처럼 분기가 많은 영역일수록 *정책을 데이터로 보고 함수로 추출*하는 게 답이었습니다. 어댑터는 정책의 *결과*만 적용하는 얇은 층이 되고, 테스트는 정책 함수만 두드리면 됩니다.
+
+검증을 *외부에서* 할 수 있어야 한다는 점도 다시 확인했습니다. SDK 내부 상태를 신뢰하기보다 fake-camera 봇으로 실제 송수신 트래픽을 만들어내고, 거기서 나오는 메트릭을 빌드 산출물에 묶어두니 화질 정책 변경이 그래프로 보이기 시작했습니다.

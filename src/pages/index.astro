@@ -1,0 +1,174 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import SectionTitle from '@/components/ui/SectionTitle.astro';
+import Divider from '@/components/ui/Divider.astro';
+import Chip from '@/components/ui/Chip.astro';
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+import LetterReveal from '@/components/effects/LetterReveal.tsx';
+import InkLink from '@/components/effects/InkLink.astro';
+import { profile } from '@/content/profile';
+
+const projects = await getCollection('projects', ({ data }) => !data.draft);
+const featured = projects
+  .filter((p) => p.data.featured)
+  .sort((a, b) => a.data.order - b.data.order);
+---
+
+<BaseLayout
+  title={`${profile.name.en} — ${profile.title.en}`}
+  description={profile.tagline.ko}
+>
+  <Container size="wide" class="pt-24 pb-28 sm:pt-32 sm:pb-36">
+    <div class="flex flex-col gap-10 max-w-[64ch]">
+      <RevealOnScroll client:load>
+        <p class="font-mono text-[11px] tracking-[0.22em] uppercase text-ink-subtle">
+          Portfolio · 2026
+        </p>
+      </RevealOnScroll>
+
+      <h1 class="text-balance leading-[1.05]">
+        <LetterReveal
+          client:load
+          text={profile.name.en}
+          delay={0.05}
+          staggerDelay={0.05}
+          as="span"
+          className="block font-display italic font-light text-6xl sm:text-7xl lg:text-8xl text-ink-primary"
+        />
+        <LetterReveal
+          client:load
+          text={profile.name.ko}
+          delay={0.05 + profile.name.en.length * 0.05 + 0.1}
+          staggerDelay={0.08}
+          as="span"
+          className="block mt-3 font-display-ko text-3xl sm:text-4xl lg:text-5xl text-ink-primary/85"
+        />
+      </h1>
+
+      <RevealOnScroll client:load delay={0.1}>
+        <p
+          class="text-xl sm:text-2xl text-ink-body leading-[1.55] max-w-[42ch] font-display italic font-light"
+        >
+          {profile.tagline.ko}
+        </p>
+      </RevealOnScroll>
+
+      <RevealOnScroll client:load delay={0.15}>
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2 text-sm">
+          <InkLink href="/projects">작업 살펴보기 →</InkLink>
+          <InkLink href="/resume">이력서</InkLink>
+          <InkLink href={profile.socials.linkedin} external>LinkedIn</InkLink>
+          <InkLink href={`mailto:${profile.email}`}>{profile.email}</InkLink>
+        </div>
+      </RevealOnScroll>
+    </div>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  {
+    featured.map((project, i) => (
+      <>
+        {i > 0 && <Divider class="mx-auto max-w-[68rem] my-0" />}
+        <section aria-labelledby={`chapter-${project.id}`}>
+          <Container size="wide" class="py-20 sm:py-28">
+            <RevealOnScroll client:visible>
+              <article class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10">
+                <header class="md:col-span-3 flex flex-col gap-4">
+                  <div class="flex items-center gap-2.5">
+                    <span aria-hidden="true" class="block h-[2px] w-6 bg-accent-maple" />
+                    <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-ink-subtle">
+                      {project.data.product}
+                    </span>
+                  </div>
+                  <div class="flex flex-col gap-1 text-sm">
+                    <span class="text-ink-muted">{project.data.period}</span>
+                    <span class="text-ink-subtle">{project.data.role}</span>
+                  </div>
+                </header>
+
+                <div class="md:col-span-9 flex flex-col gap-5">
+                  <h2
+                    id={`chapter-${project.id}`}
+                    class="text-3xl sm:text-4xl lg:text-[2.6rem] text-ink-primary text-balance leading-[1.15]"
+                  >
+                    <a href={`/projects/${project.id}`} class="group inline-block">
+                      <span class="bg-[linear-gradient(var(--color-accent-maple),var(--color-accent-maple))] bg-[length:0%_1px] bg-no-repeat bg-[position:0_100%] transition-[background-size] duration-500 ease-out group-hover:bg-[length:100%_1px]">
+                        {project.data.title}
+                      </span>
+                    </a>
+                  </h2>
+
+                  <p class="text-ink-body leading-[1.7] text-[1.05rem] max-w-[62ch]">
+                    {project.data.summary}
+                  </p>
+
+                  {project.data.highlights.length > 0 && (
+                    <ul class="mt-1 flex flex-col gap-2.5 max-w-[62ch] text-ink-muted text-[0.95rem] leading-[1.6]">
+                      {project.data.highlights.slice(0, 2).map((h) => (
+                        <li class="flex gap-3">
+                          <span
+                            aria-hidden="true"
+                            class="mt-[0.6em] block h-1 w-1 shrink-0 rounded-full bg-accent-maple/70"
+                          />
+                          <span>{h}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div class="flex flex-wrap gap-1.5 pt-2">
+                    {project.data.stack.slice(0, 6).map((s) => (
+                      <Chip>{s}</Chip>
+                    ))}
+                  </div>
+
+                  <div class="pt-3">
+                    <InkLink href={`/projects/${project.id}`}>케이스 스터디 읽기 →</InkLink>
+                  </div>
+                </div>
+              </article>
+            </RevealOnScroll>
+          </Container>
+        </section>
+      </>
+    ))
+  }
+
+  <Container size="wide" class="pb-24 sm:pb-28">
+    <div class="flex justify-end">
+      <InkLink href="/projects">전체 프로젝트 보기 →</InkLink>
+    </div>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24 sm:py-28">
+    <SectionTitle kicker="About" level={2}>
+      소개
+    </SectionTitle>
+    <div class="mt-10 flex flex-col gap-5 text-ink-body leading-[1.85] text-lg" lang="ko">
+      {
+        profile.about.ko.slice(0, 2).map((p) => {
+          const marker = 'Claude 활용 세미나';
+          if (p.includes(marker)) {
+            const [before, after] = p.split(marker);
+            return (
+              <p>
+                {before}
+                <InkLink href="/about#talks">{marker}</InkLink>
+                {after}
+              </p>
+            );
+          }
+          return <p>{p}</p>;
+        })
+      }
+    </div>
+    <div class="mt-10">
+      <InkLink href="/about">소개 더 읽기 →</InkLink>
+    </div>
+  </Container>
+</BaseLayout>

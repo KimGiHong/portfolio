@@ -1,0 +1,55 @@
+---
+title: 'ESLint · Prettier · 접근성 — 1인 코드 품질 가드레일 12개월 유지'
+summary: '800 커밋 가까이 누적되며 페이지마다 폴더 구조와 import 순서가 흩어지던 NMS-Web 프론트엔드에, 프론트엔드 단독 엔지니어로 ESLint·Prettier·a11y·VS Code workspace 설정과 약 5,000줄 컨벤션 문서를 묶어 도입하고 1년간 유지·진화시켰습니다.'
+teaser: '약 5,000줄 컨벤션 + ESLint/Prettier/a11y 가드, 12개월 운영 유지'
+role: 'Frontend Engineer'
+period: '2025.04 — 2026.04'
+product: 'NMS (Web)'
+implementation: mixed
+stack:
+  - ESLint 8 (next/core-web-vitals)
+  - Prettier 3
+  - TypeScript 5
+  - jsx-a11y
+  - Next.js 14
+highlights:
+  - 'ESLint 설정을 airbnb → `next/core-web-vitals` 기반으로 재구성. Next.js 14 App Router 패턴과의 충돌 정리.'
+  - '코딩 컨벤션 문서 약 5,000줄 작성. 파일 구조 · 네이밍 · 타입 · 상태관리 · 품질 규칙의 단일 출처.'
+  - '`lint:fix` · `format` · `format:check` · `type-check` 스크립트와 VS Code workspace 설정으로 작성 시점에 자동 적용.'
+  - 'jsx-a11y 경고 일괄 해소 — 장애 · 현황관리 · 로그인 페이지 0건. `useEffect` 의존성 누락도 함께 정리.'
+  - '1년 뒤(2026.04) 동일 담당자가 가드를 재정비. 깔고 잊는 게 아니라 12개월 운영되는 상태로 유지.'
+order: 14
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+NMS-Web은 1인 프론트엔드로 800 커밋 가까이 자라난 코드베이스였습니다. airbnb 규칙으로 시작한 ESLint가 Next.js 14 App Router의 패턴, hooks 의존성 규칙, a11y 규칙과 자주 충돌해 빌드와 리뷰에서 노이즈가 컸고, 페이지마다 폴더 구조와 import 순서가 조금씩 다른 상태였습니다.
+
+문제는 *어디 한 곳만 손봐서 풀 수 있는 일이 아니었다*는 점입니다. 규칙·도구·문서·IDE 설정이 같이 움직여야 했습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  ESLint 설정부터 `next/core-web-vitals + @typescript-eslint/recommended + prettier`로 재구성하면서, App Router 패턴과 부딪히던 airbnb 규칙을 정리했습니다. 충돌 해소가 아니라 *규칙의 베이스 자체를 갈아 끼우는* 방향이었습니다.
+</RevealOnScroll>
+
+작성 시점 자동화를 묶었습니다. `lint:fix` · `format` · `format:check` · `lint:format` · `type-check` 스크립트를 정리하고, `.prettierignore`와 VS Code workspace 설정으로 IDE에서도 같은 규칙이 적용되도록 했습니다. 페이지 단위로 jsx-a11y 경고(버튼 type, label-control 연결, click-events-have-key-events)와 `useEffect` 의존성 누락을 순회하며 일괄 해소했습니다.
+
+> 도구만 깔아 둔다고 컨벤션이 사는 건 아니었습니다. 약 5,000줄 컨벤션 문서를 같이 작성해 *왜 이 규칙인지*까지 한 곳에 적어두니, 후속 작업에서 새 규칙이 추가될 때도 같은 자리에 쌓이기 시작했습니다.
+
+## 결과
+
+- 빌드 단계의 lint 경고 다수 → CI와 IDE에서 작성 시점에 즉시 잡히는 상태로 전환.
+- jsx-a11y 경고 일괄 해소 — 장애 · 현황관리 · 로그인 페이지 **0건**.
+- 신규/리팩토링 코드가 동일 import 순서와 동일 파일 구조를 따르도록 컨벤션 문서가 단일 출처가 됨.
+- 1년 뒤(2026.04) 동일 담당자가 ESLint 설정을 재정비. 가드레일이 **12개월 운영 후에도 살아 있는 상태**.
+
+## 배운 점
+
+코드 품질 가드레일에서 가장 큰 교훈은 *도구만 깔면 안 된다*는 점이었습니다. ESLint·Prettier·VS Code 설정을 같이 묶고, 그 뒤에 *왜 이 규칙인지*를 적은 컨벤션 문서를 짝지어 두지 않으면, 6개월 뒤 누군가가 "왜 이 규칙이 있지?"라고 묻는 순간 가드레일이 무너집니다.
+
+또 하나: 1년 동안 가드를 *유지하는 사람*이 있어야 가드가 살아 있다는 사실. 깔고 잊어버리는 게 아니라, 1년 뒤에 그 사람이 다시 설정을 만지러 올 때까지가 진짜 가드레일의 수명이었습니다.

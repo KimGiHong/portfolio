@@ -1,0 +1,105 @@
+---
+/**
+ * InkLink
+ * Inline link with an ink-bleed underline that grows from the left
+ * on hover, evoking ink seeping into 한지. Falls back to an instant
+ * underline when the user prefers reduced motion.
+ */
+
+interface Props {
+  href: string;
+  external?: boolean;
+  class?: string;
+}
+
+const { href, external = false, class: className = "" } = Astro.props;
+
+const rel = external ? "noopener noreferrer" : undefined;
+const target = external ? "_blank" : undefined;
+---
+
+<a
+  href={href}
+  target={target}
+  rel={rel}
+  class:list={["ink-link", className]}
+>
+  <slot />
+  {
+    external && (
+      <svg
+        class="ink-link__icon"
+        viewBox="0 0 12 12"
+        width="10"
+        height="10"
+        aria-hidden="true"
+      >
+        <path
+          d="M3 3h6v6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.25"
+          stroke-linecap="round"
+        />
+        <path
+          d="M9 3 3.5 8.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.25"
+          stroke-linecap="round"
+        />
+      </svg>
+    )
+  }
+</a>
+
+<style>
+  .ink-link {
+    color: var(--color-ink-body);
+    text-decoration: none;
+    padding-bottom: 2px;
+    background-image: linear-gradient(
+      var(--color-accent-maple),
+      var(--color-accent-maple)
+    );
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px;
+    transition:
+      background-size 350ms ease-out,
+      color 200ms ease-out;
+  }
+
+  .ink-link:hover,
+  .ink-link:focus-visible {
+    background-size: 100% 1px;
+    color: var(--color-ink-primary);
+  }
+
+  .ink-link__icon {
+    display: inline-block;
+    margin-left: 0.2em;
+    vertical-align: 0.05em;
+    color: var(--color-ink-muted);
+    transition: color 200ms ease-out, transform 200ms ease-out;
+  }
+
+  .ink-link:hover .ink-link__icon,
+  .ink-link:focus-visible .ink-link__icon {
+    color: var(--color-accent-maple);
+    transform: translate(1px, -1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ink-link {
+      transition: none;
+    }
+    .ink-link:hover,
+    .ink-link:focus-visible {
+      background-size: 100% 1px;
+    }
+    .ink-link__icon {
+      transition: none;
+    }
+  }
+</style>

@@ -1,0 +1,169 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import SectionTitle from '@/components/ui/SectionTitle.astro';
+import Divider from '@/components/ui/Divider.astro';
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+import InkLink from '@/components/effects/InkLink.astro';
+import { profile } from '@/content/profile';
+---
+
+<BaseLayout
+  title={`About — ${profile.name.en}`}
+  description={profile.tagline.ko}
+>
+  <Container size="default" class="pt-24 pb-16 sm:pt-32">
+    <RevealOnScroll client:load>
+      <SectionTitle kicker="About" level={1}>소개</SectionTitle>
+    </RevealOnScroll>
+    <RevealOnScroll client:load delay={0.05}>
+      <p
+        class="mt-8 text-xl sm:text-2xl text-ink-body leading-[1.55] max-w-[44ch] font-display italic font-light"
+      >
+        {profile.tagline.ko}
+      </p>
+    </RevealOnScroll>
+  </Container>
+
+  <Container size="default" class="pb-24">
+    <RevealOnScroll client:visible>
+      <div class="flex flex-col gap-5 text-ink-body leading-[1.85] text-lg" lang="ko">
+        {
+          profile.about.ko.map((p) => {
+            const marker = 'Claude 활용 세미나';
+            if (p.includes(marker)) {
+              const [before, after] = p.split(marker);
+              return (
+                <p>
+                  {before}
+                  <InkLink href="#talks">{marker}</InkLink>
+                  {after}
+                </p>
+              );
+            }
+            return <p>{p}</p>;
+          })
+        }
+      </div>
+    </RevealOnScroll>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24">
+    <SectionTitle kicker="Skills" level={2}>다루는 도구</SectionTitle>
+    <RevealOnScroll client:visible>
+      <dl class="mt-12 grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-10 gap-y-6">
+        {
+          profile.skills.map((group) => (
+            <>
+              <dt class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle pt-1">
+                {group.group}
+              </dt>
+              <dd class="text-ink-body leading-[1.75]">{group.items.join(' · ')}</dd>
+            </>
+          ))
+        }
+      </dl>
+    </RevealOnScroll>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24">
+    <SectionTitle kicker="Experience" level={2}>경력</SectionTitle>
+    <div class="mt-12 flex flex-col gap-12">
+      {
+        profile.experience.map((job) => (
+          <RevealOnScroll client:visible>
+            <article class="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-10 gap-y-3">
+              <div class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle pt-1">
+                {job.period}
+              </div>
+              <div class="flex flex-col gap-2">
+                <h3 class="text-xl text-ink-primary">
+                  {job.role} · <span class="text-ink-muted">{job.company}</span>
+                </h3>
+                <p class="text-ink-body leading-[1.75]">{job.summary}</p>
+              </div>
+            </article>
+          </RevealOnScroll>
+        ))
+      }
+    </div>
+    <div class="mt-12 flex justify-end">
+      <InkLink href="/resume">이력서에서 자세히 보기 →</InkLink>
+    </div>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <section id="talks" class="scroll-mt-24">
+    <Container size="wide" class="py-24">
+      <SectionTitle kicker="Talks · Materials" level={2}>발표 · 자료</SectionTitle>
+    <div class="mt-12 flex flex-col gap-10">
+      <RevealOnScroll client:visible>
+        <article class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10 items-start">
+          <a
+            href="/materials/Claude_Agent_Handling.pptx"
+            class="md:col-span-5 group block overflow-hidden rounded-lg border border-border-soft bg-paper-aged/40 outline-none"
+          >
+            <div class="aspect-[16/9] overflow-hidden">
+              <img
+                src="/materials/claude-seminar-cover.png"
+                alt="Claude AI Agent 활용 세미나 발표 첫 슬라이드 미리보기"
+                class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+                width="1200"
+                height="677"
+                loading="lazy"
+              />
+            </div>
+          </a>
+
+          <div class="md:col-span-7 flex flex-col gap-4">
+            <div class="flex items-baseline gap-3">
+              <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle">
+                2025.04 · 사내 세미나
+              </span>
+            </div>
+            <h3 class="text-2xl text-ink-primary leading-snug">
+              Claude AI Agent 활용 세미나
+            </h3>
+            <p class="text-ink-body leading-[1.75]" lang="ko">
+              Claude를 production 코드에 통합하는 워크플로와 실전 사례를 사내 개발팀 대상으로 발표했습니다. 회사 내 AI agent 도입의 출발점이 됐고, 이후 NMS·MeetMate·CBR 등 신규 작업이 AI 페어 프로그래밍으로 전환되는 계기가 됐습니다.
+            </p>
+            <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm pt-2">
+              <InkLink href="/materials/Claude_Agent_Handling.pptx" external>
+                발표 슬라이드 (PPTX, 820KB) →
+              </InkLink>
+              <InkLink href="/materials/Claude_Agent_Handling_Script.docx" external>
+                발표 스크립트 (DOCX, 24KB) →
+              </InkLink>
+            </div>
+          </div>
+        </article>
+      </RevealOnScroll>
+    </div>
+    </Container>
+  </section>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24">
+    <SectionTitle kicker="Contact" level={2}>연락</SectionTitle>
+    <div class="mt-10 flex flex-col gap-3 text-lg text-ink-body">
+      <div>
+        <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle mr-3">
+          Email
+        </span>
+        <InkLink href={`mailto:${profile.email}`}>{profile.email}</InkLink>
+      </div>
+      <div>
+        <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle mr-3">
+          Location
+        </span>
+        {profile.location}
+      </div>
+    </div>
+  </Container>
+</BaseLayout>

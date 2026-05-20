@@ -1,0 +1,58 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+import InkLink from '@/components/effects/InkLink.astro';
+---
+
+<BaseLayout
+  title="404 — 찾을 수 없는 지면"
+  description="주소가 잘못되었거나 지면이 옮겨졌을 수 있습니다."
+>
+  <section class="relative min-h-[70vh] flex items-center overflow-hidden">
+    {/* 한지 watermark: 거대 "404" italic, soft maple wash */}
+    <span
+      aria-hidden="true"
+      class="absolute right-4 top-2 sm:right-12 sm:top-6 lg:right-20 font-display italic font-light text-[10rem] sm:text-[16rem] lg:text-[22rem] leading-none text-accent-maple/[0.06] select-none pointer-events-none whitespace-nowrap"
+    >
+      404
+    </span>
+
+    <Container size="default" class="relative py-20 sm:py-28">
+      <div class="flex flex-col gap-8 max-w-[52ch]">
+        <RevealOnScroll client:load>
+          <div class="flex items-center gap-2.5">
+            <span aria-hidden="true" class="block h-[2px] w-6 bg-accent-maple" />
+            <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-ink-subtle">
+              Page Not Found · 404
+            </span>
+          </div>
+        </RevealOnScroll>
+
+        <RevealOnScroll client:load delay={0.05}>
+          <h1
+            class="text-4xl sm:text-5xl lg:text-6xl text-ink-primary text-balance leading-[1.1]"
+            lang="ko"
+          >
+            찾으시는 지면이 없습니다.
+          </h1>
+        </RevealOnScroll>
+
+        <RevealOnScroll client:load delay={0.1}>
+          <p class="text-lg text-ink-body leading-[1.7]" lang="ko">
+            주소가 잘못되었거나, 지면이 옮겨졌을 수 있습니다. 다른 챕터로 이동해 보세요.
+          </p>
+        </RevealOnScroll>
+
+        <RevealOnScroll client:load delay={0.15}>
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2 text-sm">
+            <InkLink href="/">홈으로 →</InkLink>
+            <InkLink href="/projects">작업 둘러보기</InkLink>
+            <InkLink href="/about">소개</InkLink>
+            <InkLink href="/resume">이력서</InkLink>
+          </div>
+        </RevealOnScroll>
+      </div>
+    </Container>
+  </section>
+</BaseLayout>

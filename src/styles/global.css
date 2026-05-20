@@ -1,0 +1,320 @@
+@import "tailwindcss";
+
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Gowun+Batang:wght@400;700&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:ital,wght@0,400..700;1,400..700&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css");
+
+/* ─── tokens ─── */
+@theme {
+  --color-paper-base: #faf6ec;
+  --color-paper-aged: #f2ebd8;
+  --color-paper-fiber: #e8dfc8;
+
+  --color-ink-primary: #2b2a26;
+  --color-ink-body: #37352f;
+  --color-ink-muted: #787068;
+  --color-ink-subtle: #b5ac9e;
+
+  --color-border-soft: #e9e1ce;
+
+  --color-accent-maple: #b8463d;
+  --color-accent-pine: #4f6b3f;
+  --color-accent-ink-wash: #5a5247;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-display-ko: "Gowun Batang", ui-serif, serif;
+  --font-body: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body-ko: "Pretendard Variable", "Pretendard", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --spacing-page: 1100px;
+}
+
+/* ─── base ─── */
+@layer base {
+  html {
+    font-family: var(--font-body), var(--font-body-ko);
+    color: var(--color-ink-body);
+    background: var(--color-paper-base);
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    line-height: 1.7;
+    font-feature-settings: "ss01", "ss02", "kern";
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  :lang(ko) body,
+  body:lang(ko) {
+    font-family: var(--font-body-ko), var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), var(--font-display-ko);
+    color: var(--color-ink-primary);
+    line-height: 1.2;
+    font-feature-settings: "ss01", "ss02", "liga", "kern";
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  :lang(ko) h1, :lang(ko) h2, :lang(ko) h3,
+  :lang(ko) h4, :lang(ko) h5, :lang(ko) h6,
+  h1:lang(ko), h2:lang(ko), h3:lang(ko),
+  h4:lang(ko), h5:lang(ko), h6:lang(ko) {
+    font-family: var(--font-display-ko), var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: var(--color-paper-fiber);
+    color: var(--color-ink-primary);
+  }
+
+  :focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--color-accent-maple) 55%, transparent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--color-border-soft);
+  }
+}
+
+/* ─── prose ─── */
+@layer components {
+  .prose-paper {
+    color: var(--color-ink-body);
+    font-family: var(--font-body), var(--font-body-ko);
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    max-width: 68ch;
+  }
+
+  :lang(ko) .prose-paper,
+  .prose-paper:lang(ko) {
+    font-family: var(--font-body-ko), var(--font-body);
+    line-height: 1.85;
+  }
+
+  .prose-paper > * + * {
+    margin-top: 1.1em;
+  }
+
+  .prose-paper h1,
+  .prose-paper h2,
+  .prose-paper h3,
+  .prose-paper h4 {
+    color: var(--color-ink-primary);
+    margin-top: 2.2em;
+    margin-bottom: 0.6em;
+  }
+
+  .prose-paper h1 { font-size: 2.25rem; }
+  .prose-paper h2 { font-size: 1.65rem; }
+  .prose-paper h3 { font-size: 1.3rem; }
+  .prose-paper h4 { font-size: 1.1rem; }
+
+  .prose-paper p:first-of-type::first-letter {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 3.4em;
+    line-height: 0.9;
+    float: left;
+    padding: 0.1em 0.1em 0 0;
+    color: var(--color-ink-primary);
+  }
+
+  :lang(ko) .prose-paper p:first-of-type::first-letter,
+  .prose-paper:lang(ko) p:first-of-type::first-letter {
+    font-family: var(--font-display-ko);
+    font-size: 2.8em;
+    padding-top: 0.05em;
+  }
+
+  .prose-paper a {
+    color: var(--color-ink-body);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklch, var(--color-accent-maple) 60%, transparent);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-color 200ms ease-out;
+  }
+
+  .prose-paper a:hover {
+    text-decoration-color: var(--color-accent-maple);
+  }
+
+  .prose-paper strong {
+    color: var(--color-ink-primary);
+    font-weight: 600;
+  }
+
+  .prose-paper em {
+    font-style: italic;
+    color: var(--color-ink-primary);
+  }
+
+  .prose-paper blockquote {
+    border-left: 2px solid var(--color-accent-maple);
+    padding: 0.2em 0 0.2em 1.25em;
+    margin: 1.6em 0;
+    color: var(--color-ink-muted);
+    font-style: italic;
+  }
+
+  .prose-paper blockquote p {
+    margin: 0.4em 0;
+  }
+
+  .prose-paper :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: color-mix(in oklch, var(--color-paper-fiber) 70%, transparent);
+    color: var(--color-ink-primary);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    border: 1px solid var(--color-border-soft);
+  }
+
+  .prose-paper pre {
+    background: var(--color-paper-fiber);
+    color: var(--color-ink-primary);
+    border: 1px solid var(--color-border-soft);
+    border-radius: 6px;
+    padding: 1em 1.2em;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .prose-paper pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  .prose-paper ul,
+  .prose-paper ol {
+    padding-left: 1.4em;
+  }
+
+  .prose-paper ul { list-style: disc; }
+  .prose-paper ol { list-style: decimal; }
+
+  .prose-paper li::marker {
+    color: var(--color-ink-subtle);
+  }
+
+  .prose-paper li + li {
+    margin-top: 0.35em;
+  }
+
+  .prose-paper hr {
+    margin: 2.4em auto;
+    width: 6ch;
+    border-top: 1px solid var(--color-ink-subtle);
+  }
+
+  .prose-paper img,
+  .prose-paper figure {
+    margin: 2em 0;
+    border-radius: 4px;
+  }
+
+  .prose-paper figcaption {
+    font-size: 0.85rem;
+    color: var(--color-ink-muted);
+    text-align: center;
+    margin-top: 0.6em;
+  }
+}
+
+/* ─── utilities ─── */
+@layer utilities {
+  .no-print {
+    /* element-level print hiding */
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+}
+
+/* ─── print ─── */
+@page {
+  size: A4;
+  margin: 14mm 14mm 14mm 14mm;
+}
+
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  body {
+    /* let the document flow naturally for pagination */
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .no-print,
+  header[class*="sticky"],
+  footer,
+  [data-paper-texture],
+  button[data-print] {
+    display: none !important;
+  }
+
+  /* unwrap layout containers so the page-margin from @page does the work */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  h1, h2, h3 {
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  h2 + *, h3 + * {
+    page-break-before: avoid;
+  }
+
+  /* let articles and sections flow naturally across pages —
+     a no-break rule here forces too-tall blocks onto the next page,
+     creating large blank gaps. only individual list items stay together. */
+  li {
+    page-break-inside: avoid;
+  }
+
+  a {
+    color: black !important;
+    text-decoration: none;
+  }
+
+  hr {
+    border-top: 1px solid #ddd !important;
+  }
+
+  /* keep accent dots visible but desaturated for print */
+  .bg-accent-maple {
+    background-color: #555 !important;
+  }
+}

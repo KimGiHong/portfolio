@@ -1,0 +1,22 @@
+---
+/**
+ * Divider
+ * Ink-wash horizontal rule: 1px tall, fades in at the edges so it reads as a
+ * brushstroke rather than a hard rule.
+ */
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = 'my-16' } = Astro.props;
+---
+
+<div
+  role="separator"
+  aria-orientation="horizontal"
+  class:list={[
+    'h-px w-full bg-gradient-to-r from-transparent via-border-soft to-transparent',
+    className,
+  ]}
+></div>
