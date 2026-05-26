@@ -1,0 +1,72 @@
+---
+title: 'MeetMate v4 폴리시 라운드 — god file 분할 + Web Vitals 실측 인프라 + 회귀 가드'
+summary: 'v4를 한 달 만에 완주하고 v3 89k 라인을 제거한 직후 진행한 1주 폴리시 라운드. mateBridge 2,167 → 64 / jitsiAdapter 2,568 → 101 LOC로 god file을 도메인 분할해 메모이제이션 가능한 형태로 만들고, Web Vitals 실측 인프라를 자체 구축한 뒤 CLS 알고리즘·번들·폰트·Zustand 호출 패턴을 한 라운드에 정리해 perf-gate를 CI에 박았습니다.'
+teaser: 'god file 2,167 → 64 LOC, CLS 0.000, 폰트 woff2 -65.4%, Zustand hook 호출 -43%'
+role: 'Frontend Lead'
+period: '2026.05.20 — 진행 중'
+product: 'MeetMate (Web)'
+implementation: ai-paired
+stack:
+  - Vite
+  - React 19
+  - React Compiler
+  - Playwright
+  - Chromium DevTools Protocol
+  - Zustand
+  - axe-core
+  - Bitbucket Pipelines
+headlineMetric:
+  label: 'mateBridge god file LOC (도메인 분할 적용 전후)'
+  before: 2167
+  after: 64
+  unit: 'LOC'
+highlights:
+  - '도메인 분할 — mateBridge **2,167 → 64 LOC** (-97%), jitsiAdapter **2,568 → 101 LOC** (-96%), RoomContainer 1,465 → 365 LOC + 21 hooks 추출. Rollup circular deps 12 → 0.'
+  - 'Web Vitals 실측 인프라 자체 구축 — Playwright + Chromium DevTools Protocol, FakeRemoteTrack로 multi-user 시뮬(N=4·25·26·50) + cold join + churn 시나리오. **외부 백엔드 의존성 0**.'
+  - 'CLS 알고리즘 정정 — `useMemo` + CSS containment + GPU layer 승격 + grid hysteresis ladder + min-2 floor. cold join + broadcast churn 시나리오 **CLS 0.000** 확인.'
+  - '번들·폰트·상태 최적화 — Vite manualChunks + React Compiler ON + Router preload intent. Pretendard/SUITE 한글 KSX1001 + 실사용 글자 subset(**woff2 -65.4%**). Zustand 핫 5컴포넌트 `useShallow` + 결합 selector(**store hook 호출 28 → 16, -43%**).'
+  - 'E2E + 시각 회귀 baseline 14 시점(`toHaveScreenshot`) + axe-core + Claude vision focus + WCAG AA 색대비를 Bitbucket Pipelines **perf-gate**에 묶어 PR 단위 자동 회귀 가드.'
+order: 18
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+v4를 한 달 만에 완주하고 v3 89,724 라인을 제거한 직후, Lighthouse · Web Vitals를 다시 측정해보니 cold join 시 CLS가 흔들리고 폰트/번들 로딩에서 layout shift가 남아 있었습니다. 더 어렵게 만들었던 건 *측정 인프라 자체가 외부 백엔드에 의존*하고 있어서 회귀가 production에 도달하기 전엔 잡히지 않는 구조였다는 점이었습니다.
+
+게다가 v4 시기 빠른 빌드의 부산물로 `mateBridge`(2,167 LOC)와 `jitsiAdapter`(2,568 LOC)가 god file로 자라 있었고, 이 상태로는 컴포넌트 메모이제이션 경계를 그리기도 힘들었습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  먼저 **god file 두 개를 도메인 단위로 분할**했습니다. mateBridge 2,167 → 64 LOC, jitsiAdapter 2,568 → 101 LOC로 핵심만 남기고 나머지는 도메인 모듈로 잘라냈습니다. RoomContainer도 1,465 → 365 LOC로 슬림화하고 21개 hook을 추출. Rollup circular dependency 12 → 0.
+</RevealOnScroll>
+
+그 다음 **측정 인프라부터 다시 세웠습니다**. Playwright + Chromium DevTools Protocol로 Web Vitals(CLS · LCP · INP · TTI)를 직접 sampling하고, FakeRemoteTrack을 만들어 multi-user 시나리오(N=4·25·26·50)를 외부 백엔드 없이 시뮬했습니다. cold join + broadcast churn 결합 시나리오까지 들어가 *운영 중 churn 상황의 CLS*까지 측정 가능해졌습니다.
+
+CLS 알고리즘은 `MembersLayout`의 styles를 `useMemo`로 안정화하고 CSS containment + GPU layer 승격을 추가했습니다. 그리드 reflow는 hysteresis ladder + min-2 floor + high-water-mark로 정리해 multi-user 입퇴장 시 quality fluctuation을 흡수.
+
+> 측정 인프라가 외부 의존성에 묶여 있으면 회귀가 production에 도달한 다음에만 잡힙니다. self-contained 측정이 perf round 전체의 출발점이었습니다.
+
+번들·폰트·상태를 한 라운드에 정리했습니다. Vite manualChunks + sourcemap + font-preload + React Compiler 기본 ON + Router preload intent. 한글 폰트는 Pretendard/SUITE의 KSX1001 + 실제 사용 글자만 subset해 woff2 65.4% 감소. Zustand 핫 컴포넌트 5종은 `useShallow` + 결합 selector로 store hook 호출 28 → 16회(-43%).
+
+마지막에 회귀 가드를 묶었습니다. E2E 종합 워크플로 + 호스트 12 dialog 자동화 + 모바일 BottomSheet 6 케이스 + 시각 회귀 baseline 14 시점(`toHaveScreenshot`) + axe-core + Claude vision focus 검증 + WCAG AA 색대비를 Bitbucket Pipelines **perf-gate**에 박아 PR 단위 자동 회귀 가드.
+
+## 결과
+
+- 도메인 분할 — mateBridge **2,167 → 64 LOC** (-97%), jitsiAdapter **2,568 → 101 LOC** (-96%), RoomContainer 1,465 → 365 LOC + 21 hooks 추출.
+- Rollup circular deps **12 → 0**, biome 사전 에러 **29 → 0** + warnings **70 → 0**.
+- Web Vitals 실측 인프라 — Playwright + CDP, FakeRemoteTrack 기반 multi-user 시뮬. 외부 백엔드 의존성 0.
+- CLS 알고리즘 정정 — cold join + churn 시나리오 **CLS 0.000**.
+- 폰트 woff2 **-65.4%** (KSX1001 + 실사용 글자 subset).
+- Zustand 핫 컴포넌트 store hook 호출 **28 → 16회 (-43%)**.
+- E2E + 시각 회귀 baseline 14 시점 + axe-core + Claude vision focus를 Bitbucket Pipelines perf-gate에 묶어 PR 단위 자동 회귀 가드.
+
+## 배운 점
+
+*최적화는 측정 후에 시작한다*는 원칙을 다시 확인했습니다. 측정 인프라가 외부 의존성에 묶여 있으면 회귀가 production에 도달한 다음에만 잡히고, 그땐 이미 늦습니다. Playwright + CDP + FakeRemoteTrack으로 multi-user 시뮬을 self-contained하게 만든 게 polish round 전체의 진짜 출발점이었습니다.
+
+또 한 가지: *god file 분할 → 메모이제이션 → 측정 → 정정 → CI 가드*가 순서를 잘못 두면 효과가 안 납니다. 큰 파일을 안 쪼개면 useMemo 경계를 그릴 수 없고, 경계가 없으면 perf 측정은 노이즈만 잡습니다. 5단계를 의도적으로 묶어 1주 안에 한 라운드로 끝낸 게 *실제 사용자 체감을 바꾼* 자리였습니다.
