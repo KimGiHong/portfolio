@@ -1,0 +1,69 @@
+---
+title: 'MeetMate Web v4 모바일·태블릿 반응형 정비 — 280px 보장 + 터치 타깃 공백 해소 + 로비 분해'
+summary: '보장 최소 폭을 344px(Galaxy Z Fold 5)에서 280px까지 내리고, 44px 터치 타깃 규칙이 695~822px 태블릿 대역에서 빠져 있던 정책 공백을 메웠습니다. 동시에 로비 god-component를 플로우 훅으로 분해(428 → 327 LOC)하고 window CustomEvent 6곳을 프로젝트 표준 이벤트 버스로 옮겼습니다.'
+teaser: '보장 최소 폭 344 → 280px, 터치 타깃 적용 상한 694 → 822px, 로비 컨테이너 428 → 327 LOC'
+role: 'Frontend Lead'
+period: '2026.06.01 — 2026.07.30'
+product: 'MeetMate (Web)'
+implementation: ai-paired
+stack:
+  - React 19
+  - TypeScript
+  - styled-components
+  - SCSS
+  - Playwright
+  - Vitest
+  - i18next
+headlineMetric:
+  label: '레이아웃 회귀 가드가 보장하는 최소 viewport 폭'
+  before: 344
+  after: 280
+  unit: 'px'
+highlights:
+  - '보장 최소 폭 **344px → 280px** — iPhone SE·WCAG reflow(320)·Galaxy Fold 커버(~280)까지 Playwright 회귀 스크립트로 가로 오버플로 0 검증.'
+  - '44px 터치 타깃 규칙 적용 상한 **694 → 822px** — BottomSheet는 822까지인데 터치 타깃은 694까지만이던 태블릿 공백을 메우고, 위젯 자체 min-size가 specificity로 규칙을 이기던 곳까지 직접 상향.'
+  - 'compact 판정을 폭 단일 기준 → `pointer: coarse` + 높이 인지로 확장 — 가로모드 폰·iPad Pro도 축소 UI 대상, 데스크톱 터치스크린은 제외. footer·헤더·패널에 safe-area inset 반영.'
+  - '로비 컨테이너 **428 → 327 LOC** — 입장/생성 플로우 훅 추출 + 예약 서브트리 `React.lazy` 코드 스플릿, window CustomEvent dispatch **6곳 → 0**(이벤트 버스 통일), 하드코딩 한국어 사유 문구 → i18n 키.'
+  - '스크롤바 출현↔소멸 무한 진동을 `scrollbar-gutter: stable`로 차단, 좁은 창에서 PDF가 180° 뒤집혀 렌더되던 동시 render 경합을 동일 크기 resize 발화 무시 + 진행 중 render 취소로 정정.'
+order: 8
+featured: false
+draft: false
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## 배경
+
+v4는 데스크톱 기준으로 다듬어진 상태에서 모바일·태블릿 사용자가 늘어나자, 화면 폭과 입력 방식에 따라 갈리는 회귀가 쏟아졌습니다. 좁은 폰에서는 로비 버튼 라벨이 두 줄로 깨지고, 회의실 footer 컨트롤 8개가 한 줄에 안 들어갔습니다. 태블릿에선 BottomSheet는 모바일 UX로 뜨는데 터치 타깃은 데스크톱 크기라 누르기 어려웠습니다.
+
+원인을 추적해보니 개별 CSS 버그라기보다 *기준이 여러 개*인 게 문제였습니다. 모바일 판정은 504px, 터치 타깃은 694px, BottomSheet는 822px로 서로 다른 경계를 쓰고 있었고, 그 사이 대역이 정책 공백이었습니다. 로비는 로직이 한 컨테이너에 몰려 있어 반응형 수정 하나에도 부작용 범위가 넓었습니다.
+
+## 접근
+
+<RevealOnScroll client:visible>
+  먼저 **좁은 폭 회귀 가드를 세웠습니다.** 기존 최소 기준이던 344px(Galaxy Z Fold 5)보다 좁은 iPhone SE·WCAG reflow 320px, Galaxy Fold 커버 ~280px까지 로그인·회원가입·닉네임·로비를 Playwright 스크립트로 돌려 가로 오버플로 0, 입력 아이콘 오버레이 위치, 로비 액션 버튼 1줄 유지를 검증했습니다. 이후 모든 반응형 수정은 이 가드를 통과해야 했습니다.
+</RevealOnScroll>
+
+그 다음 **경계를 하나로 맞췄습니다.** 44px 터치 타깃 규칙을 822px까지 확장해 BottomSheet와 같은 대역을 쓰게 하고, 채팅 패널·입력 바처럼 자체 min-size가 specificity로 공용 규칙을 이기던 위젯은 compact + coarse 조건에서 직접 상향했습니다. 반대로 로그인 입력칸 장식 아이콘은 규칙에 걸려 16 → 44px로 커지며 레이아웃이 무너지던 터라 예외 처리했습니다. compact 판정은 폭만 보던 것을 `pointer: coarse` + 높이 인지로 바꿔, 가로모드 폰과 iPad Pro는 축소 UI를 받고 터치스크린 데스크톱은 그대로 두었습니다. 옵션 다이얼로그 풀스크린 게이트도 504 → 822 compact 기준으로 통일했습니다.
+
+> 반응형 버그 대부분은 CSS 한 줄이 아니라 "서로 다른 breakpoint 사이의 빈 대역"에서 나왔습니다. 개별 수정보다 경계를 통일하는 쪽이 회귀를 훨씬 많이 지웠습니다.
+
+모바일 footer는 아이콘을 줄였다가 쪼그라든다는 피드백에 되돌리고, 대신 인라인 컨트롤을 7 → 핵심 5종으로 줄이고 화면공유·손들기를 ⋯ 옵션으로 옮겨 44px를 유지한 채 344px 한 줄에 맞췄습니다. iOS처럼 `getDisplayMedia`가 없는 기기에서는 UA가 아닌 기능 감지로 화면공유 버튼을 숨기고 명확한 안내를 띄웠습니다. footer·헤더·패널엔 `env(safe-area-inset-*)`를, BottomSheet엔 키보드 인셋만큼 max-height 클램프를 걸었습니다.
+
+까다로웠던 레이아웃 버그도 원인 단위로 정리했습니다. 장치설정 페이지는 클래식 스크롤바 환경에서 "스크롤바 출현 → 폭 15px 감소 → 16:9 영상 높이 감소 → 스크롤바 소멸"이 무한 반복됐는데, `scrollbar-gutter: stable`로 피드백 루프를 끊었습니다. 좁은 창에서만 PDF가 180° 뒤집혀 보이던 건 `ResizeObserver` 초기 발화가 같은 canvas에 두 번째 render를 겹친 경합이라, 동일 크기 발화를 무시하고 진행 중 render를 취소하도록 했습니다.
+
+로비는 반응형 수정과 병행해 **3단계로 분해**했습니다. 1·2단계에서 중복 제출 가드, landmark·키보드 조작성, icon-only 버튼 라벨을 보강하고, 3단계에서 입장/생성 플로우를 훅으로 추출하고 무거운 예약 서브트리를 `React.lazy`로 분리해 비로그인 진입엔 로드되지 않게 했습니다. 페이지 전환 신호로 쓰던 window CustomEvent 6곳은 프로젝트 표준 이벤트 버스로 옮겼고(전수 grep으로 잔존 0 확인), 공용 API가 평문 한국어로 반환하던 입장 불가 사유는 i18n 키로 바꿨습니다.
+
+## 결과
+
+- 보장 최소 폭 **344 → 280px**, 280·320·344px viewport Playwright 가드 상시 운영.
+- 44px 터치 타깃 적용 상한 **694 → 822px** — 695~822px 태블릿 공백 해소, 옵션·시트·멤버 메뉴 터치 동작 통일.
+- 모바일 footer 인라인 컨트롤 **7 → 5종** + ⋯ 이관 — 아이콘 축소 없이 344px 한 줄 fit.
+- 로비 컨테이너 **428 → 327 LOC**, window CustomEvent dispatch **6곳 → 0**, 예약 서브트리 lazy 분리.
+- 스크롤바 진동·PDF 180° 반전·패널 가림·짧은 높이 클리핑 등 화면 폭 의존 회귀 정정, 로비 첫 단위 테스트 포함 2,323 테스트 통과(2026.06.30 기준).
+
+## 배운 점
+
+"반응형"을 화면 폭 하나로 생각하면 태블릿과 가로모드 폰에서 계속 새어나갑니다. 실제 사용자 경험을 가르는 건 폭·높이·입력 방식(coarse/fine)·safe-area의 조합이었고, 그걸 하나의 compact 판정으로 모은 뒤에야 회귀가 줄기 시작했습니다.
+
+또 하나, 좁은 폭 가드를 먼저 세운 게 이후 두 달의 작업을 지탱했습니다. 반응형 수정은 한 화면을 고치면 다른 폭이 깨지는 일이 흔한데, 280/320/344 가드가 있어서 "고쳤다"를 숫자로 확인하고 넘어갈 수 있었습니다.

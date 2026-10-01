@@ -3,7 +3,7 @@ title: 'MeetMate v4 폴리시 라운드 — god file 분할 + Web Vitals 실측 
 summary: 'v4를 한 달 만에 완주하고 v3 89k 라인을 제거한 직후 진행한 1주 폴리시 라운드. mateBridge 2,167 → 64 / jitsiAdapter 2,568 → 101 LOC로 god file을 도메인 분할해 메모이제이션 가능한 형태로 만들고, Web Vitals 실측 인프라를 자체 구축한 뒤 CLS 알고리즘·번들·폰트·Zustand 호출 패턴을 한 라운드에 정리해 perf-gate를 CI에 박았습니다.'
 teaser: 'god file 2,167 → 64 LOC, CLS 0.000, 폰트 woff2 -65.4%, Zustand hook 호출 -43%'
 role: 'Frontend Lead'
-period: '2026.05.20 — 진행 중'
+period: '2026.05.20 — 2026.05.27'
 product: 'MeetMate (Web)'
 implementation: ai-paired
 stack:
@@ -26,7 +26,7 @@ highlights:
   - 'CLS 알고리즘 정정 — `useMemo` + CSS containment + GPU layer 승격 + grid hysteresis ladder + min-2 floor. cold join + broadcast churn 시나리오 **CLS 0.000** 확인.'
   - '번들·폰트·상태 최적화 — Vite manualChunks + React Compiler ON + Router preload intent. Pretendard/SUITE 한글 KSX1001 + 실사용 글자 subset(**woff2 -65.4%**). Zustand 핫 5컴포넌트 `useShallow` + 결합 selector(**store hook 호출 28 → 16, -43%**).'
   - 'E2E + 시각 회귀 baseline 14 시점(`toHaveScreenshot`) + axe-core + Claude vision focus + WCAG AA 색대비를 Bitbucket Pipelines **perf-gate**에 묶어 PR 단위 자동 회귀 가드.'
-order: 18
+order: 5
 featured: false
 draft: false
 ---

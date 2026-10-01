@@ -27,7 +27,7 @@ const productMeta: Record<string, ProductMeta> = {
     platformLabelKo: '웹',
     shortLabel: 'MeetMate · Web',
     tagline:
-      'B2B 다자간 화상회의 플랫폼의 웹 클라이언트. 2026년 레거시 RN+Electron 모노레포에서 분기한 신규 React 19 SPA(v4)를 프론트엔드 단독으로 재구축해, 한 달 만에 로그인부터 호스트 기능 7배치까지 완주했습니다 (백엔드는 별도 팀원 담당).',
+      'B2B 다자간 화상회의 플랫폼의 웹 클라이언트. 2026년 레거시 RN+Electron 모노레포에서 분기한 신규 React 19 SPA(v4)를 프론트엔드 단독으로 재구축해, 한 달 만에 로그인부터 호스트 기능 7배치까지 완주했습니다. 실서비스에 투입한 뒤에는 실시간 동기화, 회의실 UX, 모바일·태블릿 대응을 다듬었습니다 (백엔드는 별도 팀원 담당).',
     stack: ['React 19', 'Vite + SWC', 'Zustand', 'TanStack Query', 'lib-jitsi-meet', 'Jenkins'],
   },
   'MeetMate (Mobile)': {
@@ -36,7 +36,7 @@ const productMeta: Record<string, ProductMeta> = {
     platformLabelKo: '모바일 · iOS + Android',
     shortLabel: 'MeetMate · Mobile',
     tagline:
-      '같은 화상회의 플랫폼의 모바일 앱. React Native 0.77로 구현됐고, 100명 회의 성능부터 iOS 릴리즈 자동화, 테스트 인프라 도입까지 프론트엔드 단독으로 책임집니다 (백엔드는 별도 팀원 담당).',
+      '같은 화상회의 플랫폼의 모바일 앱. React Native 0.77로 구현됐고, 100명 회의 성능과 실기기 미디어 안정성부터 2026년 8월 App Store·Google Play 첫 출시와 이후 연속 배포까지 프론트엔드 단독으로 책임집니다 (백엔드는 별도 팀원 담당).',
     stack: ['React Native 0.77', 'Zustand', 'lib-jitsi-meet', 'react-native-webrtc', 'Jest'],
   },
   'ClassMate (Web)': {
@@ -57,6 +57,15 @@ const productMeta: Record<string, ProductMeta> = {
       'B2B 네트워크 관리 시스템의 웹 클라이언트. Next.js 14 App Router 기반 멀티테넌트 제품으로, 초기 빌드아웃 인계 후 2년간 프론트엔드 단독으로 발전·유지하며 RBAC 권한 시스템과 데이터 로딩 아키텍처를 재설계했습니다 (백엔드는 별도 팀원 담당).',
     stack: ['Next.js 14', 'TanStack Query', 'TypeScript', 'Emotion + MUI', 'Chart.js'],
   },
+  'LMS (Web)': {
+    anchor: 'lms',
+    productName: 'LMS',
+    platformLabelKo: '학원 LMS · 웹',
+    shortLabel: 'LMS · Web',
+    tagline:
+      '입시 학원용 LMS 웹. 강사의 테스트 등록부터 MeetMate 화상 강의실 안 응시, 학생별 성적표 PDF까지 이어집니다. 2024년부터 여러 사람이 쌓아온 팀 코드베이스를 2026년 6월 인계받아 프론트엔드를 단독으로 운영하고 있습니다 (백엔드는 별도 팀 담당).',
+    stack: ['React 18', 'TypeScript', 'Redux', 'React Query', 'jsPDF', 'Webpack'],
+  },
   'CBR': {
     anchor: 'cbr',
     productName: 'CBR',
@@ -71,9 +80,10 @@ const productMeta: Record<string, ProductMeta> = {
 const groupOrder = [
   'MeetMate (Web)',
   'MeetMate (Mobile)',
-  'ClassMate (Web)',
+  'LMS (Web)',
   'NMS (Web)',
   'CBR',
+  'ClassMate (Web)',
 ];
 const groups = groupOrder
   .map((product) => ({
