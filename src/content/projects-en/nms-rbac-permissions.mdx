@@ -1,0 +1,45 @@
+---
+title: 'NMS-Web RBAC Permission System — 8 Resources × 6 Actions Unified Under a Single Prop Set'
+summary: 'NMS-Web has many roles holding different permissions across 8 domain resources. I applied a layered permission architecture that ties token-holding strategy, permission derivation, UI gates, route guards and menu visibility into one line. A single prop set on one gate component covers all 3 use sites: inline gates, route guards and menus.'
+teaser: '8 resources × 6 actions + 4 levels; one prop set unifies 3 use sites — gates, routes, menus'
+highlights:
+  - 'Standardized 8 resources (post · user · node · group · branch · report · alarm · client) × 6 actions (create · read · update · delete · message · manage) into a single constant.'
+  - '4 permission levels (NONE/READ/WRITE/ADMIN) derived automatically from the action set — `manage|delete`→ADMIN, `update|create`→WRITE.'
+  - 'Token held in a ref + silent refresh on a 15-minute interval. 0 tree re-renders on token refresh.'
+  - 'One gate prop set (`resource`/`action`/`permissions`/`requireAll`/`minLevel`/`customCheck`) unifies 3 use sites: inline gates · route guards · menus.'
+  - 'Header submenu items hide per permission via a `(roleInfo) => boolean` callback — when a permission is missing, the entry point itself is removed.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+NMS-Web is a B2B product in which many roles — admin, manager, user, viewer, custom and more — hold different read, create, update, delete, message and manage permissions across 8 domain resources. When permission checks are scattered across page entry, menu exposure, button enablement and API calls, the risk of missed permissions and security incidents accumulates arithmetically.
+
+The early build showed signs of permission branches written by hand in each component, and as pages multiplied it became harder to track *where one spot had been missed*.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I started over from the token-holding strategy. I stored the token in a ref rather than state to decouple it from tree re-renders, and exposed it through a getter function. A silent refresh runs on a 15-minute interval so the session stays alive without any user interaction.
+</RevealOnScroll>
+
+For permission data, I transform `roleInfo` once into a `resource → actions[]` shape, and on top of that built a gate component that accepts a single permission, multiple permissions, a permission level, or a custom callback. I reused the same props surface in the page-level route guard and in the header submenu's `accessCheck` callback.
+
+> When one component handles gates, routes and menus, permission policy changes in one place and propagates to every screen immediately.
+
+I designed permission levels to be derived automatically from the action set — `manage` or `delete` means ADMIN, `update` or `create` means WRITE, only `read` means READ, and anything else NONE. Call sites can choose either a *resource × action* spec or a *permission level* spec depending on intent — exposing the same policy through two representations gave call sites both readability and precision.
+
+## Results
+
+- **8** resources × **6** actions standardized into a single enum/const.
+- **4** permission levels (NONE/READ/WRITE/ADMIN), derived automatically.
+- Token refresh on a **15-minute interval** + held in a ref — 0 tree re-renders on token refresh.
+- One gate prop set unifies **3 use sites** (inline gate / route guard / menu visibility).
+- Submenu items hide per permission via a callback — when a permission is missing, the entry point itself is removed.
+
+## What I Learned
+
+For a cross-cutting concern like permissions, the safest structure was *deciding the policy in one place and applying it in many places through the same prop surface*. Writing permission branches directly in each UI component makes the risk of omissions grow arithmetically with every new page, but consolidating into a single gate means *one policy change = reflected on every screen immediately*.
+
+One more thing: the small decision to hold the token in a ref is what stopped a flood of re-renders. The most practical lesson from this work was that cross-cutting state like auth refresh needs to be kept out of the tree's render cycle.

@@ -1,0 +1,45 @@
+---
+title: 'A Single Source of Truth for Breakout-Group Video/Audio Visibility — Blocking Asymmetric Regressions at Compile Time'
+summary: 'The video grid and WebRTC audio gating expressed the same visibility in different code paths, so asymmetric regressions — "visible but not audible, or audible but not visible" — kept recurring. I unified them into a single source of truth, so both are exposed only by passing through the same one pure function.'
+teaser: 'A single predicate unifies video and audio — asymmetric regressions blocked at compile time'
+highlights:
+  - 'The video grid and remote audio track gating pass through the same visibility predicate. Regression surface for visible ↔ audible asymmetry: 0.'
+  - 'Isolation mode is entered on a single condition: active groups ≥1. The same rule applies with no host exception.'
+  - 'Remote audio is muted at the browser level with `MediaStreamTrack.enabled=false`. 0 WebRTC renegotiations, 0 changes to the mic icon state.'
+  - 'The local user''s own track is explicitly skipped via an endpoint-match check. The user''s mic toggle stays authoritative.'
+  - '4 regression tests (lobby host ↔ in-group / group A ↔ group B members / own mute authority / unmute on returning to the lobby).'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+While breakout groups were active, regressions were repeatedly reported where the video of a host who stayed in the lobby remained visible to participants inside a group, and group members' video was exposed to the host. The video layout filter and the remote audio track gating code were separate, each expressing *the same visibility semantics* on its own, so patching only one side immediately produced an asymmetric regression.
+
+The problem wasn't that "bugs happen often" but that "expressing the same meaning in two places makes asymmetry *structurally* possible."
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I extracted the visibility decision into a single pure function taking `(member, { activeGroupId, groups })` as input. If even one group is active, isolation mode kicks in, and I enforced that both the video grid filter and the `MediaStreamTrack.enabled` gating of remote audio tracks expose a participant only by passing through this predicate.
+</RevealOnScroll>
+
+The local user's own track is explicitly skipped via an endpoint-match check to keep the user's mic toggle authoritative. This decision explicitly blocks a case we had seen before: when gating overwrote local enabled, lib-jitsi-meet's `isMuted()` early-return caused a regression where XMPP presence wasn't sent.
+
+> I don't look at video and audio separately. When the same predicate result is applied to both, asymmetry becomes impossible on the surface.
+
+I used Zustand `subscribeWithSelector` so the gating is idempotently reapplied only on group/member changes. When active groups drop back to 0, the gating set returns `null` — a full unmute handled in one line, so returning to the lobby needs no separate handling.
+
+## Results
+
+- **1** visibility predicate called from both the video and audio entry points — regression surface for asymmetry: 0.
+- Isolation mode on a single condition, active groups ≥1, with no role exceptions.
+- Remote audio gating via browser-level `enabled=false` — **0** WebRTC renegotiations.
+- The user's own mic toggle stays authoritative — fixed the regression where `isMuted()` early-return caused XMPP presence not to be sent.
+- Added 4 regression tests (lobby/group host, members of other groups, own mute authority, unmute on returning to the lobby).
+
+## What I Learned
+
+The most direct lesson was that when the same meaning is expressed in two places, asymmetry appears whenever one side lags or wavers. A structure that *decides the meaning in one place and applies it to both sides* closes regressions at compile time without adding any if statements.
+
+One more thing: WebRTC track control and domain visibility semantics had to be *separate layers*. lib-jitsi-meet's mute method is an authoritative user action that also affects XMPP presence, whereas group isolation is an audiovisual block at the browser level. Handling both with the same method undermines that authority — the choice to toggle only `MediaStreamTrack.enabled` and leave the SDK's mute untouched was the core of that separation.

@@ -1,0 +1,51 @@
+---
+title: 'Unresponsive After Rejoining, Sometimes Silent — Tracing Real-Device Media Defects to Their Root Causes'
+summary: 'Real-device defects like "after I leave and rejoin, the mic and camera toggles don''t work" and "sometimes I can hear audio, sometimes I can''t" — I didn''t patch them symptom by symptom; I went down to the root causes and cut them off there. The stuck state after rejoining was caused by local tracks from previous sessions piling up, and the intermittent silence was four overlapping causes, including a structural defect where audio routing was never started at all. The Fold6 rejoin deadlock was resolved with a patch, going all the way down to the react-native-webrtc native executor.'
+teaser: 'Stuck after rejoin · Fold6 gUM deadlock · 4-layer intermittent silence · phantom leaves — root-cause fixes'
+highlights:
+  - 'Mic and camera toggles after rejoining: **unresponsive → propagating correctly** — the code that releases local tracks on leave was defined but never actually called, so tracks from previous sessions piled up and calls quietly succeeded. This also explained why all 5 earlier fixes attempted on the observer side had no effect.'
+  - 'Intermittent silence: **4 layers of structural causes removed** — zero calls anywhere in the app to start audio routing, stereo forced on native only, mic acquisition failures silently swallowed, and no recovery when a track died. I unified routing into a single channel and connected Bluetooth and wired earphones via `react-native-incall-manager` (43 contract tests).'
+  - 'Mic and camera on Fold6 rejoin: **gum.timeout → acquired normally** — a blocking camera dispose was holding up the same single-threaded executor as getUserMedia. It couldn''t be solved from JS, so I used patch-package to move the native dispose to a separate thread.'
+  - '**Phantom leaves → 0** from Notification Center and emergency alerts — no leave is sent on iOS inactive state or brief transitions to background; the app leaves only after a 7.5-minute grace timer expires. In the background, only the camera pauses and audio continues; I added PiP and an Android foreground service.'
+  - 'Unit tests **175 → 1,685** — every fix shipped with a regression test that reproduces its cause.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Once the mobile app went into real classes, defects that never showed up in the simulator were reported all at once. Reports like: "after the instructor leaves and rejoins, their mic status stops changing", "I tapped OK on an emergency alert and got kicked out of the meeting room", "rejoining on a Fold6 leaves the device screen loading forever", and "with both AirPods and Buds, audio cuts in and out".
+
+What they had in common was that *reproduction was intermittent, and where the symptom appeared was not where the cause lived*. At first I fixed the observer-side display logic five times, with no improvement at all.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I changed direction and **suspected the sending side rather than the symptom**. After comparing against the web reference implementation and bisecting the git history, I found that the leave path never released local tracks. Every rejoin piled a new track onto the track array, and the toggle picked the first element of the array — the previous session's track. Since that track was already detached from the meeting, the mute call "quietly succeeded" without an exception, and the signal went nowhere.
+</RevealOnScroll>
+
+In the same way, I **re-examined the entire rejoin path**. I cut off each of these problems: rejoining after waking from sleep reused a connection object tied to a dead socket; a leave request that never completed pushed back releasing the camera; and device enumeration and local track creation had no timeouts, causing infinite spinners. The camera is now released before the leave request, and every wait point has an upper bound.
+
+Only the Fold6 was left. Diagnostics on the real device showed gum.timeout for both camera and mic. The cause was that react-native-webrtc on Android handles getUserMedia and track dispose on **the same single-threaded executor**. On foldables with multiple front cameras, closing a Camera2 session takes a long time, and in the meantime rejoin requests queued up behind it.
+
+> Retrying from JS only stacks more requests onto a blocked thread. If the blockage is native, the fix had to be native too.
+
+I wrote a patch that moves the blocking dispose to a separate thread and kept it with patch-package so it's applied automatically on install. Around the same time, a Fold6 stutter where web users' video kept freezing and resuming turned out to come from a weakness in the mobile hardware VP9 decoder. I fixed it by changing the codec order to prefer VP8.
+
+I investigated the **intermittent silence** along three tracks (path diagnosis, routing, and an exhaustive comparison against web), and concluded it wasn't a recent regression but four long-standing structural defects stacked on top of each other. Audio routing was never started at all, so output went to the earpiece or the speaker depending on the OEM, and native alone was forcing stereo and a high bitrate. Mic acquisition failures were silently ignored, and there was no listener to detect when a track died from an interruption such as an incoming call. I unified routing into a single channel and made it reapply only an output explicitly chosen during the session. That way, a "speaker" selection from last week doesn't steal audio from the AirPods you connected today. On iOS, starting routing actually conflicted with AirPods, so I used the native audio session configuration instead. When a track dies, it's reacquired after 1.2 seconds, with reacquisition capped at 3 times per session.
+
+I also reworked the lifecycle. In situations that take you out of the app briefly — Notification Center, Control Center, emergency alerts — no leave is sent; the app leaves only after the 7.5-minute grace period is exceeded. In the background, only the camera pauses, and PiP and an Android foreground service keep the meeting going.
+
+## Results
+
+- Stuck mic and camera toggles after rejoining resolved — changes propagate correctly on both your own screen and other participants' screens.
+- Fold6 rejoin gum.timeout resolved (native executor patch); web users' video stutter resolved (VP8 preferred).
+- 4 layers of structural causes of intermittent silence removed, Bluetooth and wired earphone routing connected, mic acquisition failures surfaced to the user (43 contract tests).
+- Phantom leaves caused by brief interruptions eliminated, camera paused in the background, PiP, foreground service.
+- Unit tests **175 → 1,685**.
+
+## What I Learned
+
+I learned that there are *defects you must not fix where the symptom shows up*. The stuck state after rejoining surfaced on the observer's screen, but the cause was on the sending side, and all five observer-side fixes were wasted effort. A "call that quietly succeeds" leaves no error log, so the only way to find it was to follow where the data actually flows, all the way to the end.
+
+Also, intermittent defects usually didn't have just one cause. Had I tried to explain the silence with a single cause, I would have fixed only one of the four layers and left it in a "sometimes comes back" state. Splitting the investigation into tracks, working each separately, and then putting them together is what let me close the problem in one go.

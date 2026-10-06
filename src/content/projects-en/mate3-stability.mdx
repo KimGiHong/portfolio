@@ -1,0 +1,43 @@
+---
+title: 'A Meeting Room That Doesn''t Crash — Runtime Guards and a Resource-Cleanup Campaign'
+summary: 'Memory leaks and stale-closure crashes that surfaced sporadically during long meetings, reconnects, and repeated join/leave cycles were closed out for good by separating ErrorBoundary from lifecycle policy, applying console guards across the board, and fixing four memory leaks at once.'
+teaser: '4 memory leaks fixed at once, 166 __DEV__ guards, 4 dependencies removed'
+highlights:
+  - '4 memory leaks fixed together in one PR. Bundled timeout tracking, unsubscribing, BackHandler cleanup, and timer clearing.'
+  - '`__DEV__` console guards applied across 166 calls in 55 files. Production stdout is now empty.'
+  - 'Audio-level listener leak removed. Blocks ~5,000 event dispatches per second (based on 100 people × 50 per second).'
+  - 'ErrorBoundary at the top of the App tree. Lifecycle split out into a policy that auto-disconnects after 7.5 minutes in the background.'
+  - '4 unused dependencies removed. package-lock down 872 lines, and build time dropped along with it.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Once all the features were in, the *places that break in production* started to show. Memory leaked slowly at the end of long meetings, stale closures piled up listeners at the moment of reconnecting after returning from the background, and when the WebSocket received a malformed payload, the exception thrown by `JSON.parse` took down the screen outright — all sporadically.
+
+The problem was that *where to start was unclear*. Trying to fix everything at once had no end, and fixing just one spot let another one break again.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First, **I cast a net**. I placed an `ErrorBoundary` at the top of the app tree so that an exception drops to a fallback instead of killing the screen. Next, I gathered the lifecycle policy in one place — a lifecycle manager singleton automatically disconnects after 7.5 minutes in the background, and a network monitor is responsible for reconnecting.
+</RevealOnScroll>
+
+For the leaks themselves, I fixed *all four causes* together in one PR: made the connection service's timeouts trackable, explicitly released the timeouts on store subscriptions, released the BackHandler subscription on component unmount, and cleared the notification store's timers on meeting leave.
+
+> By storing handlers and timeouts directly on the track object, I made it possible to *grab exactly the same reference again at release time*.
+
+Finally, I cleaned up *console noise across the entire codebase*. I applied `__DEV__` guards to 166 `console.*` calls so stdout stays empty in production, and in the same commit removed 4 unused dependencies, cutting package-lock by 872 lines.
+
+## Results
+
+- `__DEV__` guards applied: **166 console calls across 55 files**.
+- 4 memory leaks fixed at once (timeout tracking · unsubscribing · BackHandler cleanup · timer clearing).
+- Audio-level listener leak removed — **blocks 5,000 event dispatches per second** (based on 100 people × 50 per second).
+- 4 unused dependencies removed → package-lock **−872 lines**.
+- 5 runtime crash guards added, including a WebSocket `JSON.parse` try-catch, a `Number()` NaN guard, and guaranteed ordering for `Promise.all`.
+
+## What I Learned
+
+The hard part of stability work is that *the results are invisible*. The better you do it, the more nothing happens for users. That made it important to *leave the names of the places that broke in PRs and commit messages* — the moment you write down "4 memory leaks," those four become a record that *cannot break the same way again*.

@@ -1,0 +1,42 @@
+---
+title: 'Introducing Unit Tests to an RN App with Zero Tests'
+summary: 'I laid down a Jest baseline in an RN app that had gone 7 months without any test code, and in a single burst began covering — across 10 files — the 6 Zustand stores that form the nervous system of a meeting, the hot-path utilities, and the HTTP layer.'
+teaser: '0 → 10 test files, 2,000+ lines in a single burst, regressions caught right after'
+highlights:
+  - 'From 0 tests to 10 files running immediately. 2,000+ lines introduced in a single burst.'
+  - 'Covered the 6 Zustand stores first, starting with the nervous system of a meeting (member · auth · notification · room · track · shareLayout).'
+  - 'Established 13 operations docs in the same batch. Infrastructure and docs started in the same place.'
+  - 'The same store tests backed up the memory-leak and NaN-guard regressions in the very next cycle.'
+  - 'Also covered the hot-path utilities, the HTTP layer, and 2 WebSocket handlers, protecting where the meeting domain''s truth lives first.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Over 7 months of fast building, there wasn't a single line of test code. Regressions were piling up in the Zustand stores and WebSocket handlers, and nobody could confidently say "how much of it actually works."
+
+The question was where to start. Laying tests across every UI component would take far too long, and laying them down haphazardly would leave *the places that actually break* uncovered.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I decided to cover **the nervous system of a meeting first**. UI has many variations and is expensive to test, but Zustand stores have clear input→output and are where the meeting domain's *real truth* lives.
+</RevealOnScroll>
+
+I set up a Jest baseline and covered first the 6 Zustand stores that form the nervous system of a meeting (member · auth · notification · meeting room · track · shared layout), plus the hot-path utilities, the HTTP layer, and 2 WebSocket handlers.
+
+I bundled 13 operations docs into the same commit. So that infrastructure and docs wouldn't settle in separately, *starting them together in one place* was a clearer signal to whoever came next.
+
+> More important than the number 0 → 10 was *which 10*. Choosing *10 for the nervous system of a meeting* instead of 10 UI tests is what caught the regressions in the very next cycle.
+
+## Results
+
+- **+9,706 lines** introduced in a single commit (2,000+ lines of tests, ~6,700 lines of operations docs).
+- 0 tests → **10 files** running immediately (6 stores + 1 service + 1 utils + 2 handlers).
+- The same store tests caught the memory-leak and NaN-guard regressions in the very next cycle.
+- 13 operations docs established at the same time — from the project overview to coding conventions, alongside the infrastructure.
+
+## What I Learned
+
+The starting point was accepting *responsibility for not having set up test infrastructure sooner*. If you don't touch it because it's late, it stays late forever. The priority of *the places that actually break first, instead of perfect coverage* ended up helping the most.

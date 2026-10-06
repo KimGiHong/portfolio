@@ -1,0 +1,55 @@
+---
+title: 'MeetMate Web v4 — A New SPA Forked from a Legacy RN Monorepo'
+summary: 'Without any service downtime, I forked a React 19 SPA out of an RN+Electron monorepo and, as the sole frontend engineer, went from login through 7 batches of host features in one month. In the final stretch I got the regression-guard round to pass, removed 89,724 lines of v3 legacy code in one sweep, and finished with Web v4 as the single target (the backend was handled by a separate teammate).'
+teaser: '230 commits in a month, FSD violations 475 → 0, 89k lines of v3 removed in one sweep'
+headlineMetric:
+  label: 'FSD boundary violations — before and after the CI guard'
+  unit: 'violations'
+highlights:
+  - 'Migration completed — after passing the regression-guard round (18 WebSocket domains + 5 member-seed cases blocked), I removed 1,233 files / 89,724 lines of v3 legacy code on the same day.'
+  - '475 → 0 FSD boundary violations. Enforced in both lefthook and CI, so it can''t break the same way again.'
+  - '1,943 Vitest cases + Playwright E2E. 230 commits (+131k/−40k) in one month as the sole frontend engineer, 0 service outages.'
+  - 'A 1.3MB gzip bundle budget, 5 parallel tenant builds, and an axe-core regression baseline tied into a single Jenkins pipeline.'
+  - 'Dropped Redux and mapped state onto 4 axes by type: Zustand for real-time, TanStack Query for server, Jotai for derived, RHF+Zod for forms.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+MeetMate was a multi-party video conferencing platform that ran React Native + Electron + Web from a single codebase. Over 200 JS files had piled up on top of Redux and global objects, making the code tightly coupled and the web hard to evolve quickly on its own. Every new feature meant worrying about mobile, Electron, and web at the same time.
+
+The problem wasn't simple code cleanup. The 5 tenant builds couldn't stop, the v3 screens in active use had to be preserved pixel for pixel, and I had to nail boundaries in somewhere so the new codebase wouldn't break down the same way again.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I started by **drawing the boundaries first**. I isolated v4 with Turborepo + pnpm workspaces, and attached a custom guard script to the 6 layers of Feature-Sliced Design to block violating imports in both lefthook and CI.
+</RevealOnScroll>
+
+I mapped state onto 4 axes by type: Zustand for real-time, TanStack Query (suspense-first) for server, Jotai for derived/UI, and React Hook Form + Zod for forms. v3's Redux `dispatch` calls and global API objects were mechanically replaced with new store actions and the `ky` HTTP client.
+
+> Move only the internal code without changing a single pixel of the UI — I wrote this principle down and enforced it on every PR.
+
+I isolated Jitsi and our own WebSocket domains behind an "immutable boundary," and restructured things so that side effects are injected into domain stores from a single adapter only. The Jenkins pipeline bundled 5 parallel tenant builds + a 1.3MB gzip bundle budget + an axe-core regression baseline across 3 pages into a single stage.
+
+## Results
+
+- Concentrated 230 commits (+131k/−40k) on v4 over one month as a single engineer. 0 service outages.
+- Reached login → lobby → device selection → room → 7 batches of host features (notifications · reactions · E2EE · recording · whiteboard · polls, etc.).
+- 475 → 0 FSD boundary violations. 1,943 Vitest cases + Playwright E2E + an axe-core regression baseline across 3 pages.
+- 1.3MB gzip bundle budget enforced in CI, 5-tenant build matrix automated.
+
+## Finishing the Migration
+
+In the final round of the migration, I added regression-guard tests across 18 domains of inbound WebSocket events in one pass, and blocked 5 cases of placeholders resurrecting in the member seed with store-level invariants. I unified the lifecycles of the two sessions, Mate and Jitsi, under a single bridge-session concept so they start and tear down in one place.
+
+On the same day the round passed (typecheck clean · 0 FSD boundary violations · 1,943 Vitest cases with 0 failures), I removed the month-old safety net — 1,233 files / 89,724 lines of v3 legacy code — in one sweep. That included the RN platform directories, Electron, the original v3 React source, and the webpack/Babel/Metro build chain that came with them. Web v4 became the single target.
+
+> Confidently deleting a month-old safety net is also a self-check on the new system.
+
+## What I Learned
+
+Migration turned out to be *not about moving code but about moving decisions*. Where each piece of state lives, which imports are allowed, what bundle size is a red light — the migration really started to finish the moment I nailed those decisions into CI instead of PR review.
+
+One more thing: the principle of forcibly preserving the v3 UI felt constraining at first, but in the end it separated *design decisions* from *code decisions*, so only one of them could be shaken at a time. Redrawing the UI was a job for after the system had stabilized.

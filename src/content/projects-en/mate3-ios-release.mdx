@@ -1,0 +1,41 @@
+---
+title: 'Graduating from "Works on My Mac" — Automating iOS Builds and Releases'
+summary: 'I took iOS builds that kept failing around the move to RN 0.77''s New Architecture and tied them together with 4 shell scripts and an npm chain, getting to a state where a release is a one-line `build:ios:testflight` command.'
+teaser: '4 iOS build traps → one-line shell + automated TestFlight upload'
+highlights:
+  - 'Pinned the 4 manual click-through procedures for fixing build failures into 4 shell scripts: Codegen, DerivedData, icon compositing, icon generation.'
+  - 'App Store upload rejected because of the AppIcon alpha channel → passes. White background composited with `sips --composite`.'
+  - 'TestFlight upload reduced to one line: `npm run build:ios:testflight`. archive → IPA → altool chain.'
+  - 'Android crashes and app freezes from the same period cleaned up in the same batch. Both platforms back to buildable on the same day.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Moving up to RN 0.77 set off a whole set of iOS build traps at once. Codegen output collided with the cache so builds failed repeatedly, DerivedData had to be cleared by hand every time, and the AppIcon was getting App Store uploads rejected because of its alpha channel.
+
+There were 4 manual click-through procedures, one for each symptom, but *who had to click what, in what order* lived only in someone's head. A "works on my Mac" build was really a build that worked only inside one person's head.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I pinned each of the 4 build traps into its own shell file. `fix_codegen.sh` selectively deletes only `ios/build/generated` and runs `pod install` automatically (so no time is wasted deleting all of `build/`). `fix_xcode_build.sh` clears DerivedData in one go.
+</RevealOnScroll>
+
+The AppIcon alpha-channel issue was resolved in `fix_icon_transparency.sh` by compositing a white background with `sips --composite`, and icon generation was set up in `generate_ios_icons.sh` to take a 1024pt original and automatically generate 10 sizes down to 20pt.
+
+> A build should be "a sequence pinned down in scripts," not "a procedure people remember" — from the moment I accepted that, *debugging time* dropped even more than build time.
+
+Finally, I created a `build:ios:archive → export → upload → testflight` chain in `package.json`. Everything up to the App Store Connect upload via `xcrun altool` now fits in a single command, and I bundled in the Android crash and app-freeze issues that came up at the same time, stabilizing both platforms together.
+
+## Results
+
+- 4 manual click-through procedures for build failures → **pinned into one-command shell scripts** (`fix_codegen.sh` / `fix_xcode_build.sh` / `fix_icon_transparency.sh` / `generate_ios_icons.sh`).
+- App Store upload rejected because of the AppIcon alpha channel → **passes**. 11 icon PNGs + Info.plist updated together.
+- TestFlight upload can be done with **one line: `npm run build:ios:testflight`** (archive → IPA → altool chain).
+- Handling Android/iOS stabilization from the same period as one batch reached *a state where both platforms could build again on the same day*.
+
+## What I Learned
+
+Not confining frontend work to *what's on the screen* turned out to be the fastest path. The moment you push iOS builds, codegen, icons, and TestFlight uploads outside your own scope, "I don't know why it doesn't work" becomes a weekly recurring task. Breaking that cycle with 4 shell scripts and 4 npm scripts gave back more time than any feature I added.

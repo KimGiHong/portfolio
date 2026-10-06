@@ -44,6 +44,31 @@ const projectsCollection = defineCollection({
   }),
 });
 
+// English translations. Only translatable fields live here — order, period,
+// featured, implementation, product and metric numbers stay in the Korean
+// source so the two locales can never drift apart (merged in lib/projects.ts).
+const projectsEnCollection = defineCollection({
+  loader: glob({
+    pattern: '*.mdx',
+    base: './src/content/projects-en',
+  }),
+  schema: z.object({
+    title: z.string(),
+    summary: z.string(),
+    teaser: z.string(),
+    role: z.string().optional(),
+    stack: z.array(z.string()).optional(),
+    highlights: z.array(z.string()),
+    headlineMetric: z
+      .object({
+        label: z.string(),
+        unit: z.string().optional(),
+      })
+      .optional(),
+  }),
+});
+
 export const collections = {
   projects: projectsCollection,
+  projectsEn: projectsEnCollection,
 };

@@ -1,0 +1,45 @@
+---
+title: 'A Complex Permission Screen as a Reducer State Machine — 9-Action Discriminated Union + Multi-Key Indexing'
+summary: 'An operator · manager many-to-many selection screen was scattered across many useState calls, causing recurring regressions such as excluded users being missed when a company was removed. I closed it out by binding everything in one place with a 9-action discriminated union + an identity-preserving reducer + multi-key Map indexing + cache tier settings.'
+teaser: '9-action discriminated union + multi-key indexing + 2-tier cache split'
+highlights:
+  - 'Unified state-change entry points with a 9-action discriminated union. Mutations previously scattered across many `useState` calls are serialized into one reducer.'
+  - 'No-op actions return the same object (identity preservation) — safe for child component memoization.'
+  - 'Cleanup of dependent excluded users on company removal is handled in the same transaction — removing the risk of omission from UI code.'
+  - 'Master data IDs indexed under three keys at once — original · `String` · `Number` — absorbing backend type drift.'
+  - 'Cache tier split — company data staleTime 5 min / gcTime 10 min, master data (permissions · alarms) staleTime 10 min / gcTime 30 min.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+The NMS group · site permission screen has to handle several things at once: moving companies between two lists (all ↔ selected), infinite scroll of managers, excluded users that must be removed along with their company, and serialization of the Apply button. Previously this was scattered across many `useState` calls, so *a bug where excluded users were missed on company removal* kept recurring, and code manually guarding against the missed cases kept piling up on each screen.
+
+The problem wasn't "bugs happen often" — it was a structure where "one mutation depends on another, and the call site has to remember that every time."
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I gathered every state mutation in one place with a `useReducer`-based custom hook that defines a 9-action discriminated union type. When nothing changes it returns the same object to *block unnecessary renders*, and inside the company-removal action I bound the derived effect of "also cleaning up the dependent excluded users" into the same transaction.
+</RevealOnScroll>
+
+> If the same change has to happen in two places, one action handles both. Anything a call site could forget is not left to the call site.
+
+The separate master data map is indexed under three keys at once — original · string · number — to absorb backend type drift (where the same ID sometimes arrives as a string and sometimes as a number). Rather than putting type checks in every UI component, registering all three keys at indexing time keeps call sites always safe.
+
+For cache tiers, I separated company data (`staleTime` 5 min / `gcTime` 10 min) from master data (`staleTime` 10 min / `gcTime` 30 min) to match change frequency and retention value — so data that changes often and data that rarely changes aren't handled under the same cache policy.
+
+## Results
+
+- State-change entry points unified with a **9-action** discriminated union.
+- No-op actions return the same object → referential equality preserved → safe for child component memoization.
+- Cleanup of dependent excluded users on company removal handled in **the same transaction**.
+- Master data IDs use **three-key simultaneous indexing** — absorbing backend type drift.
+- **2** cache tiers (5 min/10 min vs 10 min/30 min) — split by change frequency.
+
+## What I Learned
+
+When complex state is scattered across many `useState` calls, *cases where one mutation depends on another* get left to the call site. Making every call site write the same guard each time ultimately means there will be *a spot where responsibility for the change gets dropped*. A discriminated union + reducer was a structure that *absorbs those cases into the definition of the mutation*.
+
+One more thing: *noise we can't control*, like backend type drift (string vs number IDs), was cleanest to absorb at the entry point. Rather than putting type checks in every UI component, registering all three keys at indexing time keeps call sites always safe.

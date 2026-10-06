@@ -1,0 +1,55 @@
+---
+title: 'Sweeping Real-Time Sync Regressions in MeetMate Web v4 — Mobile Drop Recovery + Participant State Consistency'
+summary: 'I added a reconnection state machine to the control channel, where a single brief network drop on mobile used to permanently freeze chat, the member list, and host controls, and fixed 22 sync regressions that were "wrong only on other people''s screens" at the root cause by checking them against the v3 protocol. I also capped simultaneously received tiles on low-end mobile at 25 → 8 to prevent overheating and crashes.'
+teaser: '22 sync regressions fixed, mobile received tiles 25 → 8, whiteboard undo from wiping the board → removing a single stroke'
+headlineMetric:
+  label: 'Cap on simultaneously received video tiles on low-end mobile'
+  unit: 'tiles'
+highlights:
+  - 'Control-channel reconnection **none → exponential-backoff reconnect + 25s heartbeat** — fixed the state where, after backgrounding, screen lock, or a Wi-Fi↔LTE switch, video survived but chat, the member list, and host controls froze permanently. Re-auth → rejoin → session restore is now automatic.'
+  - '**22** sync regressions fixed at the root cause — ghost tiles, mobile↔PC participants not seeing each other, mic shown as ON when joining muted, instructor names shown as ids, VOD deletion · document focus · chat permissions not propagating, and other bugs that were "wrong only on someone else''s screen," sorted out by checking against the v3 wire protocol.'
+  - 'Whiteboard undo **wiping the entire board in one press → removing only the last stroke** — hardened the receiver to trust only fields the server guarantees to preserve, and closed the path where my own ACK echo cleared only my screen.'
+  - 'Mobile resources — stopped background power saving from being invalidated on every speaker change, capped received tiles on low-end devices at **25 → 8** · resolution at 360p. Fixed iOS `AudioContext` starting suspended, which left the level meter at 0 and sent silence with the voice changer on.'
+  - 'The Jitsi reconnection fence, which trapped clients in a permanent "failed" state after frequent drops, now resets only on a genuine `online` event — mobile recovers automatically while the defense against desktop idle-rejoin storms stays in place.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Once the v4 rebuild and polish round were done and the product went into real classes and meetings, the bug reports changed in kind. They weren't about rendering or performance but of the *"my screen is right, but someone else's is wrong"* type. When the host changed chat permissions, participants didn't see it; participants who joined with their camera and mic off disappeared from other people's grids; one whiteboard undo wiped the entire board.
+
+Mobile was the most serious. The control WebSocket simply ended when it disconnected, so the moment someone locked and unlocked their screen or moved from Wi-Fi to LTE, Jitsi would recover the video but chat, the member list, and host controls stayed frozen for good. Most of these bugs depended on races or variations in the server environment, so reproduction was hit or miss.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First, I added a **reconnection state machine to the control channel**. On an unexpected close, it automatically chains exponential-backoff reconnect → re-auth → rejoin → re-announcing the media session id, while an explicit leave does not reconnect. A 25-second heartbeat detects half-open sockets and forcibly drops and reattaches them, and `online` / `visibilitychange` events act as backstop triggers. I relaxed the request timeout for mobile from 5s → 15s but deliberately added no automatic retry — commands like mute or kick must never be applied twice.
+</RevealOnScroll>
+
+I also fixed bugs in the reconnection path itself. The cleanup step just before rejoining also wiped notification subscriptions that were supposed to live for the app's whole lifetime, so after the first reconnection, every reconnection and failure notification went permanently silent. On the Jitsi side, the fence was "5 attempts within 60 seconds means permanent failure," but resetting it on success would reopen desktop idle-timeout rejoin storms. So I kept the fence accumulating but made it **reset only on a genuine network recovery (`online`)**, which keeps the desktop defense while letting only mobile recover automatically.
+
+> With reconnection, "what not to do again" mattered more than "reconnecting." Timeouts without automatic retry and a fence reset keyed to online rather than success were both choices to prevent double application and storms.
+
+I sorted out participant state by **checking it piece by piece against the v3 wire protocol**. The reconcile step I had added to prevent ghost tiles was actually misjudging mobile and tablet participants with slow Jitsi mapping as ghosts and deleting them permanently, and once someone was marked as left, there was no path to bring them back. I narrowed the leave condition to "the id exists but the endpoint has disappeared," opened a new recovery path for when the mapping or track arrives, and widened the initial roster retry window from 3 steps to 6 (up to 10 seconds). Participants with both camera and mic off are expected not to publish tracks, so I excluded them from the check.
+
+I worked through the rest the same way: past-tense event normalization over-trimming verbs ending in 'e' (Disabled/Enabled) so dispatches were dropped; nickname and PIN silently becoming no-ops when the server sent id variants; the asymmetry where mic-off joiners appeared as ON (mic was flag-based, camera was track-based); turning all cameras OFF→ON not actually re-enabling the tracks; and late-joining students not getting the attendance prompt. I also made unmapped broadcasts emit one diagnostic log per class, so "the event never arrives" symptoms could be confirmed on the spot.
+
+For the whiteboard, undo was intentionally changing only local state, and its premise — "the server doesn't support per-stroke deletion" — was wrong. I now broadcast the diff between the before/after undo/redo snapshots as a single stroke deletion or re-addition, and the receiver decides on single deletions based only on fields the server reliably preserves, so it can never fall back to a full clear. I also closed the last path, where the ACK for my own request came back through the same handler and cleared only my board.
+
+For mobile resources, I stopped background power saving from being invalidated by re-enabling reception on every speaker change, and on low-end devices (`pointer: coarse` + narrow width) I left pagination as is and capped only at the receive level: ≤8 tiles · ≤360p resolution. On iOS, I cleaned up decoder leaks with `AudioContext` resume and by releasing video `srcObject` on unmount.
+
+## Results
+
+- Control-channel reconnection **none → exponential backoff + 25s heartbeat + online/visibility backstop**. Chat, the member list, and host controls are restored automatically after a brief mobile network drop.
+- **22** sync regressions that were "wrong only on someone else's screen" fixed (+5,433 / -292 lines), most of them with regression tests — 27 cases for the ghost-tile defense alone.
+- Whiteboard undo **wiping the entire board → removing only the last stroke**, consistent on both other participants' screens and my own.
+- Simultaneously received tiles on low-end mobile **25 → 8**, resolution capped at 360p. Background power saving preserved.
+- Initial roster retry window **3 → 6 steps** (up to 10 seconds) — slow mobile participants no longer go missing.
+- Unit tests **2,323 → 2,516** (2026.06.30 → 07.13).
+
+## What I Learned
+
+"My screen is right" meant nothing in real-time collaboration. Thanks to optimistic updates, the side that caused the bug looks fine, and the damage always happens on other participants' screens. So I got into the habit of pinning down three branches with separate tests for every fix: *the sender side, the receiver side, and my own echo*.
+
+One more thing: defensive logic was often the cause of regressions. The ghost-tile reconcile deleted slow participants, the reconnection fence trapped healthy mobile clients, and the cleanup step wiped subscriptions. I learned that when adding a defense, I have to design *"if this misjudges, is there a path to undo it?"* at the same time.

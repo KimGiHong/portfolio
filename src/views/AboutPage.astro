@@ -1,0 +1,181 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/layout/Container.astro';
+import SectionTitle from '@/components/ui/SectionTitle.astro';
+import Divider from '@/components/ui/Divider.astro';
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+import InkLink from '@/components/effects/InkLink.astro';
+import { getProfile } from '@/content/profile';
+import { localizePath, useTranslations, type Locale } from '@/i18n';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const profile = getProfile(locale);
+const seminarMarker = t('about.seminarMarker');
+const talkNote = t('about.talk.langNote');
+---
+
+<BaseLayout
+  title={`About — ${profile.name.en}`}
+  description={profile.tagline}
+  locale={locale}
+>
+  <Container size="default" class="pt-24 pb-16 sm:pt-32">
+    <RevealOnScroll client:load>
+      <SectionTitle kicker="About" level={1}>{t('about.title')}</SectionTitle>
+    </RevealOnScroll>
+    <RevealOnScroll client:load delay={0.05}>
+      <p
+        class="mt-8 text-xl sm:text-2xl text-ink-body leading-[1.55] max-w-[44ch] font-display italic font-light"
+      >
+        {profile.tagline}
+      </p>
+    </RevealOnScroll>
+  </Container>
+
+  <Container size="default" class="pb-24">
+    <RevealOnScroll client:visible>
+      <div class="flex flex-col gap-5 text-ink-body leading-[1.85] text-lg">
+        {
+          profile.about.map((p) => {
+            if (p.includes(seminarMarker)) {
+              const [before, after] = p.split(seminarMarker);
+              return (
+                <p>
+                  {before}
+                  <InkLink href="#talks">{seminarMarker}</InkLink>
+                  {after}
+                </p>
+              );
+            }
+            return <p>{p}</p>;
+          })
+        }
+      </div>
+    </RevealOnScroll>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24">
+    <SectionTitle kicker="Skills" level={2}>{t('about.skills')}</SectionTitle>
+    <RevealOnScroll client:visible>
+      <dl class="mt-12 grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-10 gap-y-6">
+        {
+          profile.skills.map((group) => (
+            <>
+              <dt class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle pt-1">
+                {group.group}
+              </dt>
+              <dd class="text-ink-body leading-[1.75]">{group.items.join(' · ')}</dd>
+            </>
+          ))
+        }
+      </dl>
+    </RevealOnScroll>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24">
+    <SectionTitle kicker="Experience" level={2}>{t('about.experience')}</SectionTitle>
+    <div class="mt-12 flex flex-col gap-12">
+      {
+        profile.experience.map((job) => (
+          <RevealOnScroll client:visible>
+            <article class="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-10 gap-y-3">
+              <div class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle pt-1">
+                {job.period}
+              </div>
+              <div class="flex flex-col gap-2">
+                <h3 class="text-xl text-ink-primary">
+                  {job.role} · <span class="text-ink-muted">{job.company}</span>
+                </h3>
+                <p class="text-ink-body leading-[1.75]">{job.summary}</p>
+              </div>
+            </article>
+          </RevealOnScroll>
+        ))
+      }
+    </div>
+    <div class="mt-12 flex justify-end">
+      <InkLink href={localizePath('/resume', locale)}>{t('about.resumeLink')}</InkLink>
+    </div>
+  </Container>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <section id="talks" class="scroll-mt-24">
+    <Container size="wide" class="py-24">
+      <SectionTitle kicker="Talks · Materials" level={2}>{t('about.talks')}</SectionTitle>
+    <div class="mt-12 flex flex-col gap-10">
+      <RevealOnScroll client:visible>
+        <article class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10 items-start">
+          <a
+            href="/materials/Claude_Agent_Handling.pptx"
+            class="md:col-span-5 group block overflow-hidden rounded-lg border border-border-soft bg-paper-aged/40 outline-none"
+          >
+            <div class="aspect-[16/9] overflow-hidden">
+              <img
+                src="/materials/claude-seminar-cover.png"
+                alt={t('about.talk.coverAlt')}
+                class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+                width="1200"
+                height="677"
+                loading="lazy"
+              />
+            </div>
+          </a>
+
+          <div class="md:col-span-7 flex flex-col gap-4">
+            <div class="flex items-baseline gap-3">
+              <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle">
+                {t('about.talk.meta')}
+              </span>
+            </div>
+            <h3 class="text-2xl text-ink-primary leading-snug">
+              {t('about.talk.title')}
+            </h3>
+            <p class="text-ink-body leading-[1.75]">
+              {t('about.talk.body')}
+            </p>
+            {talkNote && <p class="text-sm text-ink-muted">{talkNote}</p>}
+            <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm pt-2">
+              <InkLink href="/materials/Claude_Agent_Handling.pptx" external>
+                {t('about.talk.slides')}
+              </InkLink>
+              <InkLink href="/materials/Claude_Agent_Handling_Script.docx" external>
+                {t('about.talk.script')}
+              </InkLink>
+            </div>
+          </div>
+        </article>
+      </RevealOnScroll>
+    </div>
+    </Container>
+  </section>
+
+  <Divider class="mx-auto max-w-[68rem] my-4" />
+
+  <Container size="default" class="py-24">
+    <SectionTitle kicker="Contact" level={2}>{t('about.contact')}</SectionTitle>
+    <div class="mt-10 flex flex-col gap-3 text-lg text-ink-body">
+      <div>
+        <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle mr-3">
+          Email
+        </span>
+        <InkLink href={`mailto:${profile.email}`}>{profile.email}</InkLink>
+      </div>
+      <div>
+        <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle mr-3">
+          Location
+        </span>
+        {profile.location}
+      </div>
+    </div>
+  </Container>
+</BaseLayout>

@@ -1,0 +1,45 @@
+---
+title: '60fps Collaborative Canvas — Real-Time Annotation over PDFs, Whiteboards, and VODs, Built from Scratch in RN'
+summary: 'On the web, the collaborative annotation canvas was built on Konva, but React Native has no equivalent, so I rewrote it from scratch. 60fps freehand drawing + 7 tools + pinch zoom + per-line real-time sync + permission-based partial erasing, unified in a single 947-line component.'
+teaser: '947-line 60fps SVG canvas, 7 tools + permission-based partial erasing'
+highlights:
+  - 'In the PanResponder hot path, only refs are updated instead of React state, with rendering throttled via `requestAnimationFrame`. Stops the setState flood.'
+  - 'New points are dropped when they move less than 2px from the previous point (`dx² + dy² < 4`). Points per stroke cut to roughly a third.'
+  - 'SVG `<ClipPath>` clips the in-place text editing area — a workaround for `overflow: hidden` not working on SVG in RN.'
+  - '7 tools (pen · line eraser · partial eraser · rectangle/circle/triangle · text · handler) + permission-based partial erasing + per-line server sync, unified in a single 947-line component.'
+  - 'Canvas and screen coordinate systems separated — stored in document coordinates, rendered in one transform via `<G transform>`.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+We needed a collaborative canvas that shows PDFs, whiteboards, and recorded VODs on top of the video conferencing screen, where instructors and participants annotate together with pens, shapes, and text. The web version was built on Konva, but React Native has no Konva equivalent, and 60fps freehand drawing, pinch zoom, per-line server sync, and permission-based partial erasing all had to work on a single screen.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I rewrote it from scratch with `react-native-svg`, choosing a structure where the touch hot path updates only refs instead of React state and throttles rendering with `requestAnimationFrame`. The prerequisite for 60fps was deliberately separating, inside the same component, a *second flow that does not pass through* React's render cycle.
+</RevealOnScroll>
+
+The pen drops a new point when it moves less than 2px from the previous one to keep points from piling up, and panning runs on its own rAF so it doesn't collide with the drawing rAF. For PanResponder, I blocked stale closures with a `useRef(callback) + useEffect` sync pattern so it always calls the latest callback.
+
+> 60fps freehand drawing is impossible with setState. Using only refs and rAF lets you route around React's render cycle.
+
+Text is clipped with an SVG `<ClipPath>` so it is only visible inside its rectangular box — a decision to work around `overflow: hidden` not working on SVG in React Native. For shapes and text, negative drags are handled with `flipX/flipY` flags so they render identically whichever direction you drag. The partial eraser checks line-to-point distance and encodes permissions so that only the line's owner or a user with SHARE permission can delete it.
+
+Each line is sent exactly once, before it is saved to the store, with `width`/`height` converted to integers and `undefined` fields and redundant `points` stripped to keep the payload consistent.
+
+## Results
+
+- 7 tools unified in a single **947-line** component (pen / line eraser / partial eraser / rectangle·circle·triangle / text / handler).
+- Point-culling threshold of **2px** — points per stroke reduced to roughly a third.
+- PanResponder stale closures blocked — `useRef(callback) + useEffect` sync always calls the latest handler.
+- Consistent line-sync payloads — integer conversion + `undefined` field removal + redundant `points` removal.
+- Minimum **20px** drag threshold for text boxes — prevents the input modal from opening on accidental touches.
+
+## What I Learned
+
+Handling 60fps graphics in React Native required a *path that does not go through* React's render cycle. The PanResponder + ref + rAF combination lives in the same component yet is a *second flow* separate from React's state flow. Unless you deliberately keep the two apart, 60fps is impossible.
+
+One more thing: the *decision to separate* the canvas coordinate system from the screen coordinate system made a surprisingly big difference. Storage uses original document coordinates, and rendering converts in one go with `<G transform="translate scale">` — no coordinate recalculation on zoom or pan, and the same line shows up in exactly the same place on other devices.

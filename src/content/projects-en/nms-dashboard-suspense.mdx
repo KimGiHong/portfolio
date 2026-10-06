@@ -1,0 +1,45 @@
+---
+title: 'Dashboard Data Loading — Partial Suspense + Cache Reuse'
+summary: 'Right after taking over the initial build-out, I reworked a dashboard where 5–7 widgets fired at once and the whole page waited on a single spinner. Restructuring it with per-widget Suspense boundaries, a cache-first popup and a reusable infinite-query provider brought it to per-section loading with 0 extra network calls.'
+teaser: 'Per-widget partial loading, 0 extra API calls, 246 lines slimmed by 80%'
+highlights:
+  - 'Single page spinner → per-widget partial loading. Standardized on `useSuspenseQuery` with a Suspense boundary per widget.'
+  - '0 extra API calls for the map popup. Clicking a card reuses the cached result of the list call as-is.'
+  - 'Introduced a reusable infinite-query provider. Context and pagination sealed into one module; pages inject only queryKey/queryFn.'
+  - 'Split a 246-line single component into context · hooks · view. File size slimmed by about 80%.'
+  - 'Switched marker icons from external SVG fetches to base64 inline. Extra resource requests eliminated.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+The NMS-Web frontend was a codebase I took over solo during its initial build-out phase (the backend stayed with a separate teammate). At handover, the dashboard was the first screen operators and clients saw after logging in, and it fired 5–7 widgets simultaneously — incidents, ports, systems, map, Top-Nodes and more. The entire page waited on one loading spinner, so fast widgets were held hostage to the slowest one.
+
+The map data grew heavier in proportion to the number of sites, and every time a card click opened a popup, it re-fetched nearly the same information as the list. My first major task after the handover was to rework this data-loading architecture.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I started by **cutting the loading boundaries into smaller pieces**. I standardized `useQuery` on `useSuspenseQuery` and placed a `<Suspense fallback>` boundary per widget, breaking the page-level spinner down into section-level ones. Fast widgets no longer waited on slow ones.
+</RevealOnScroll>
+
+I changed the map popup so that a card click no longer hits a separate API, and instead reuses the cached result of the list call as-is. I switched marker icons from external SVG fetches to base64 inline, eliminating extra resource requests.
+
+I abstracted the infinite-scroll logic repeated on every page into a generic provider factory. Context, pagination and `getNextPageParam` behavior are sealed in one place, and pages inject only queryKey and queryFn.
+
+> Instead of repeating the same pattern across many pages, building it well once and re-injecting it turned out to be the fastest path.
+
+## Results
+
+- Single page spinner → per-widget partial loading. Fast widgets no longer wait on slow ones.
+- **0** extra network calls when opening the map popup (cache reuse).
+- External SVG requests for marker loading eliminated.
+- Infinite-scroll use sites (incidents · messages · QnA · map sites, etc.) consolidated into a single provider.
+- Split a 246-line single component into context · hooks · view, slimming it by about **80%**.
+
+## What I Learned
+
+The biggest realization from reworking the data-loading architecture was that *where you place a Suspense boundary is itself a UX promise*. With a boundary per widget, users can tell "which widget is slow"; with one around the whole page, they can't tell "what is slow." Same library, different promise.
+
+One more thing: for patterns every page ends up repeating, like infinite queries, abstracting them well once lets later pages come in without paying the pattern cost. With a single use site the abstraction cost feels wasteful, but the moment you see 4–5, abstraction becomes the fastest path.

@@ -1,0 +1,44 @@
+---
+title: 'Unifying 3 Domains × 3 Channels of Notifications Under a Single Router'
+summary: 'The notification system was scattered across 3 domains (Q&A · community · conference) × 3 channels (toast · popup · list). Owning the notifications area within the team, I tied it together with a single normalized payload + Map-based merging + a WebSocket-integrated evbus. A single click composes page transition, domain select, submenu activation and content-ID branching in one callback.'
+teaser: '9 exposure points → one container; 5 click branches composed in 1 callback'
+role: 'Frontend Engineer (Team)'
+highlights:
+  - '3 domains (Q&A · community · conference) × 3 channels (toast · popup · list) = **9 exposure points** unified into a single pair of containers.'
+  - '**5** notification-click entry branches (qna / post / contents / survey / conference) composed in a single callback — domain select action + pagination event + submenu dispatch in one place.'
+  - 'Map-based ID merging + reverse-chronological sort combine server fetches and real-time pushes idempotently.'
+  - 'WebSocket case branches and the router pagination event (`UPDATE_PAGENATION`) bound to the same evbus, for 0 screen-restoration cost.'
+  - 'Toast queue throttled at 500ms · auto-dequeue after 3 seconds; unread items marked read in bulk when the popup opens; auto-dispose on outside click.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+ClassMate was an LMS product in which 3 domains — coach-coachee Q&A, community (posts · contents · surveys) and conference — coexisted in one app. Notification UI · state · navigation were scattered per service, and issues kept piling up: toasts vanished immediately with no queuing, or a click failed to take users to the exact location (which domain, which content, which page). Because web and mobile were running in parallel, a single click had to restore the router, submenu and list selection all at once.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I unified the notification payload into a single normalized schema, `{ service, service_id, payload }`. A Map-based ID-merging reducer integrates server fetches and real-time pushes idempotently, and through the `eventManager` channel toast · popup · list all subscribe to the same store.
+</RevealOnScroll>
+
+The core was **a single callback that restores everything in one click**. I structured the router so that the per-domain select action + pagination event + submenu dispatch are composed inside one function across 5 service branches (qna / post / contents / survey / conference).
+
+> A notification's job is *returning the user to the original screen state*. Navigating the router alone isn't enough. Only when the page · submenu · list item · pagination position are all restored together does a notification truly work.
+
+Toasts needed queuing. They live in a Map-based store, and middleware auto-dequeues them on a 3-second timer. The popup marks unread notifications read in bulk when it opens, and auto-disposes on outside-click detection. The list paginates unread items only — because every channel is derived from the same store, wherever the read state changes, the other channels follow immediately.
+
+## Results
+
+- 3 domains × 3 channels = **9 exposure points** unified into a single pair of containers (`Alarm` / `ToastAlarm`).
+- **5** notification-click entry branches composed in a single callback.
+- Server fetches + real-time pushes combined idempotently with Map merging + reverse-chronological sort — 0 surface for duplicate or ordering regressions.
+- Toast queue throttled at **500ms** + auto-dequeue after **3 seconds**, infinite scroll with a page size of 20.
+- **17 commits over 12 weeks, owning the notifications area within the team** — the backend was handled by a separate teammate, and other screen areas were co-developed with colleagues.
+
+## What I Learned
+
+In a *cross-domain integration area* like notifications, the biggest realization was that **state and routing must be bound to the same evbus**. If notification click → page transition → submenu activation → list selection → pagination restore don't all happen in the same callback, some step trails *behind*, causing flicker or showing the wrong location. When every channel subscribes to the same store, state changes once at click time and the UI falls into line naturally.
+
+One more thing: *a merge reducer that absorbs server fetches and real-time pushes into the same code path*. Whether a new notification arrives over WebSocket or through pagination, handling it in one place with idempotent Map-key-based merging naturally closes the race when both input channels arrive at the same time.

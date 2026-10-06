@@ -1,0 +1,53 @@
+---
+title: 'LMS Test & Score Report Integrity — Triaging 20 Client Change Requests and Fixing Screens That Showed Wrong Numbers'
+summary: 'I took a "not taken" filter that showed only 7 of 97 students and made it show all of them, and brought section point totals from 168 → 100 and the elective-subject participation distribution from 5 → 3 people so they match the real counts. Over three months I sorted a 27-slide client change request into 20 items and worked through them by risk, while making the list and detail views use the same criteria for test card status and score report visibility.'
+teaser: '"Not taken" filter 7 → 97 people, point total 168 → 100, endless refetch every 3–5s → once, orphan tests 0'
+headlineMetric:
+  label: 'Students shown by the "not taken" filter on the submission status screen (out of 97 who had not taken the test)'
+  unit: 'people'
+highlights:
+  - '"Not taken" filter **7 → 97 people** — replaced a status filter that only filtered the first page the client had already loaded with server-side filtering + pagination, and corrected the total count to (assigned − submitted).'
+  - 'Score report section point total **168 → 100** — common questions that were counted again for every elective-subject combination are now counted once, by question number. For the same reason, the participation distribution is recalculated from actual per-subject submission counts instead of the server''s aggregate (5 people when 3 had taken it).'
+  - 'Endless list refetch **every 3–5s → once per response** — the remaining time, frozen at submission, kept coming down as a positive value, so the timer kept reloading the list; I switched to an absolute expiry time and capped the wait for grading at deadline + 10 minutes.'
+  - 'Orphan tests left behind when lesson registration was canceled **→ 0** — switched to lazy creation, so tests are created only after the lesson registration API succeeds, and on partial failure the created tests and the new lesson are rolled back together.'
+  - '27-slide client change request → **20 classified items** (6 UI / 14 logic, with 5 video-app items split off) — batch-handled the low-risk UI first and passed server-dependent items to the backend team with evidence; 154 commits in this area alone over three months.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+This is an LMS web app for private academies. The core flow: instructors register tests, students take them in the live classroom (MeetMate) or on the web, and after the deadline each student gets a score report PDF. In early June the client sent a 27-slide change request, and when I actually went through it, *UI requests were mixed in with bugs where the numbers were wrong.*
+
+For example, the "not taken" filter on the submission status screen showed only 7 of 97 students, the elective-subject participation distribution chart drew 5 people when 3 had taken the test, and the section scores for Korean language added up to a point total of 168. The student test card status (Take test / Completed / Closed / Grading in progress / View score report) was also decided by different criteria in the list and the detail view, so sometimes the list said "View score report" but opening it showed the answer-check sheet instead.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First I **sorted the 27 slides of requests into 20 items**: 6 low-risk UI/CSS items, 14 items that came with logic or server decisions, and 5 items on the video app side that I couldn't touch from this repo. I finished the UI layout work in one pass, and ran each of the 14 logic items through *code location → server dependency → implementation → verification against real data*. For items that needed the server to change first, I passed them to the backend team with evidence for why the client alone couldn't get them right.
+</RevealOnScroll>
+
+For the number bugs, **I narrowed down the cause by looking at the actual responses.** The "not taken" filter broke because the client only filtered the pages it had loaded, so I moved it to a server-side filter. The participation distribution was coming down from the server's statistics +1 too high each time, so I separately fetched the actual submission count per subject, re-aggregated, and reported it as a server bug. The 168-point total came from common questions being included again for each elective-subject combination, so I applied the same "dedupe by question number" used in the per-question analysis table to the section scores as well, bringing it to 100.
+
+> When a number on screen was wrong, the cause was usually *the same data being counted in two places by different criteria*. Every time I fixed one, I consolidated "who counts this number" into one place.
+
+I bound card status and score report visibility so that **the list and the detail view call the same function**. I wrote a separate check to distinguish an instructor force-closing the classroom from the test period actually ending, which stopped score reports from appearing before the period was over. To make the card switch to "Closed" without a refresh when an individual timer ran out, I put the expiry time into the state update — and that created a loop that reloaded the list every 3–5 seconds on submitted cards. So I switched to an absolute expiry time based on when the response was received, so the same response triggers only one update; for the wait on grading, it refetches at deadline + 1 minute, retries every 30 seconds, and stops at deadline + 10 minutes.
+
+On the lesson registration screen, I changed **when tests get created**. Previously a test was created on the server as soon as you reached the test setup step, so canceling the lesson registration left a test that wasn't attached to anything. Now test → detailed type → questions are created in that order only after the lesson registration succeeds, and if anything fails along the way, everything created is rolled back. Along the way, an infinite render loop caused by passing a new array on every render was broken by pinning the reference with `useMemo`.
+
+On the score report PDF side, I added an English absolute-grading layout (raw score, grade, top score, grade distribution) to the generator that draws directly with jsPDF, and made the score data management screen automatically restore the projected grade cutoffs and per-question analysis table when you come back to it. At first I downloaded and parsed a saved Excel file, but once the server built a new per-question analysis API for me, I moved to that and deleted the Excel parsing path. The two sources are loaded separately with `Promise.allSettled`, so if one fails the other is still restored.
+
+## Results
+
+- "Not taken" filter shows **7 → 97 people** (everyone who hadn't taken the test).
+- Score report section point total **168 → 100**, elective-subject participation distribution **5 → 3 people** (matching the actual number of submissions), and the participation pie chart's incorrect 100% label fixed.
+- Endless refetch of the student list **every 3–5s → once per response**; the refetch while waiting for grading is capped at deadline + 10 minutes.
+- **0** orphan tests left after canceling lesson registration (lazy creation + rollback on partial failure).
+- Test card status and score report visibility are decided by the same criteria in the list and detail views — resolving the "score report in the list, answer-check sheet in the detail" mismatch.
+- 27-slide client change request → 20 classified items, 154 commits in this area over three months. Reported 2 server-side aggregation bugs to the backend team with evidence.
+
+## What I Learned
+
+Most screens with wrong numbers weren't *calculation mistakes* but *counting in more than one place*: the client counting only part of the pages, server statistics drifting from the actual submission list, or the list and detail views deciding status with different functions. Each time, I checked the actual response first and used "one source for this number" as the rule, and the same kind of bug didn't come back on other screens.
+
+The other lesson is that **real-time updates and a flood of requests are a fine line apart**. The expiry time I added to change status without a refresh turned straight into an endless refetch loop. Since then, whenever I add auto-refresh, I decide up front both "how many times does it fire for the same input" and "when does it stop."

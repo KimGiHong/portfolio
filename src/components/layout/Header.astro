@@ -4,20 +4,33 @@
  * Sticky paper-tinted nav with backdrop blur. Border-bottom appears only
  * after the page scrolls past the brand baseline (data-scrolled attribute
  * toggled by a tiny inline script). Mobile uses a CSS-only <details>
- * disclosure for the link list.
+ * disclosure for the link list. The language switch keeps the reader on the
+ * same page in the other locale.
  */
+import {
+  getLocaleFromPath,
+  localizePath,
+  stripLocale,
+  switchLocalePath,
+  useTranslations,
+} from '@/i18n';
 
-const pathname = Astro.url.pathname;
+const locale = getLocaleFromPath(Astro.url.pathname);
+const otherLocale = locale === 'ko' ? 'en' : 'ko';
+const t = useTranslations(locale);
+// Active-state matching works on the locale-neutral path.
+const pathname = stripLocale(Astro.url.pathname).replace(/\/$/, '') || '/';
+const switchHref = switchLocalePath(Astro.url.pathname, otherLocale);
 
-const links: { href: string; label: string }[] = [
-  { href: '/', label: 'Home' },
-  { href: '/about', label: 'About' },
-  { href: '/projects', label: 'Projects' },
-  { href: '/resume', label: 'Resume' },
+const links: { path: string; label: string }[] = [
+  { path: '/', label: t('nav.home') },
+  { path: '/about', label: t('nav.about') },
+  { path: '/projects', label: t('nav.projects') },
+  { path: '/resume', label: t('nav.resume') },
 ];
 
-const isActive = (href: string) =>
-  href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
+const isActive = (path: string) =>
+  path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(path + '/');
 ---
 
 <header
@@ -27,7 +40,7 @@ const isActive = (href: string) =>
   <div class="mx-auto max-w-[68rem] px-6 sm:px-8 lg:px-10">
     <div class="flex items-center justify-between gap-6 h-16 sm:h-20">
       <a
-        href="/"
+        href={localizePath('/', locale)}
         class="group inline-flex items-baseline gap-2 text-ink-primary"
         aria-label="KimGiHong · 김기홍 — Home"
       >
@@ -46,17 +59,17 @@ const isActive = (href: string) =>
             links.map((link) => (
               <li>
                 <a
-                  href={link.href}
-                  aria-current={isActive(link.href) ? 'page' : undefined}
+                  href={localizePath(link.path, locale)}
+                  aria-current={isActive(link.path) ? 'page' : undefined}
                   class:list={[
                     'relative inline-block py-1 transition-colors duration-200',
-                    isActive(link.href)
+                    isActive(link.path)
                       ? 'text-ink-primary'
                       : 'text-ink-muted hover:text-ink-primary',
                   ]}
                 >
                   {link.label}
-                  {isActive(link.href) && (
+                  {isActive(link.path) && (
                     <span
                       aria-hidden="true"
                       class="absolute left-0 right-0 -bottom-0.5 h-px bg-accent-maple"
@@ -66,6 +79,19 @@ const isActive = (href: string) =>
               </li>
             ))
           }
+          <li aria-hidden="true" class="h-3 w-px bg-border-soft" />
+          <li>
+            <a
+              href={switchHref}
+              hreflang={otherLocale}
+              lang={otherLocale}
+              aria-label={t('lang.switchLabel')}
+              data-astro-reload
+              class="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-subtle hover:text-accent-maple transition-colors"
+            >
+              {t('lang.switchShort')}
+            </a>
+          </li>
         </ul>
       </nav>
 
@@ -73,7 +99,7 @@ const isActive = (href: string) =>
       <details class="sm:hidden mobile-nav relative">
         <summary
           class="list-none inline-flex items-center justify-center w-10 h-10 -mr-2 cursor-pointer text-ink-primary"
-          aria-label="Toggle navigation"
+          aria-label={t('nav.toggle')}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path d="M3 6h14" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
@@ -90,11 +116,11 @@ const isActive = (href: string) =>
               links.map((link) => (
                 <li>
                   <a
-                    href={link.href}
-                    aria-current={isActive(link.href) ? 'page' : undefined}
+                    href={localizePath(link.path, locale)}
+                    aria-current={isActive(link.path) ? 'page' : undefined}
                     class:list={[
                       'block px-4 py-2 text-[14px] transition-colors',
-                      isActive(link.href)
+                      isActive(link.path)
                         ? 'text-ink-primary'
                         : 'text-ink-muted hover:text-ink-primary',
                     ]}
@@ -104,6 +130,18 @@ const isActive = (href: string) =>
                 </li>
               ))
             }
+            <li class="mt-1 border-t border-border-soft pt-1">
+              <a
+                href={switchHref}
+                hreflang={otherLocale}
+                lang={otherLocale}
+                aria-label={t('lang.switchLabel')}
+                data-astro-reload
+                class="block px-4 py-2 text-[14px] text-ink-muted hover:text-accent-maple transition-colors"
+              >
+                {t('lang.switch')}
+              </a>
+            </li>
           </ul>
         </nav>
       </details>

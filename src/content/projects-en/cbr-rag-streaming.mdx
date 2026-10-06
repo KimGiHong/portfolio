@@ -1,0 +1,47 @@
+---
+title: 'RAG Chatbot SSE Streaming Pipeline + Pending-Latency Architecture Redesigned in 5 Days'
+summary: 'I solved the RAG chatbot''s long time-to-first-token and the loss of responses when users navigated away with 6-stage SSE events plus a global StreamManager that lives outside the route; then, 5 days after the first release, I collapsed state scattered across three axes — Context + Reducer + localStorage — into the React Query cache as a single source, cutting perceived pending latency again. (On the team I owned SSE streaming and state lifetime; on the backend I extended a teammate''s code with SSE endpoints and more, working with an AI agent.)'
+teaser: '6-stage SSE events + a StreamManager that survives navigation, and my own code redesigned within 5 days'
+role: 'Frontend Engineer (Team · some backend extension)'
+headlineMetric:
+  label: 'State-layer lines cut by the redesign 5 days after the first release'
+  unit: 'LOC'
+highlights:
+  - '6 SSE event types (`start` / `status` / `delta` / `progress` / `complete` / `error`) + an `event: close` termination signal. A progress event is emitted every 10 chunks.'
+  - 'Zero responses lost on navigation. A global `chatId → { AbortController, Promise }` StreamManager awaits the in-flight Promise via `ensureStreamCompletion`, so the correct answer reaches the cache.'
+  - '5 days after the first release, unified the three axes of Context + Reducer + localStorage (−235 LOC) into the React Query cache — applying the "UI state = server cache state" principle after the fact.'
+  - 'Up to 3 retries / exponential backoff 1·2·4s / 5-minute timeout / 15-second safety timeout to guard against zombie pending states.'
+  - 'Sending the server-side message_id up front in the `start` event resolves the client temporary ID ↔ real ID mapping in one direction.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+A response from the RAG chatbot goes through LLM calls, vector search, reranking, history lookup, and keyword/title generation, so the gap before the first token was long. With a single POST response, users had to stare at a blank screen for 7–10 seconds, and if they moved from the chat detail to another tab, the response was cut off and never reached the cache.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  On the server I defined 6-stage SSE events: `start → llm_ready → context_ready(N documents) → streaming → delta×N → complete/close`. A progress event flows alongside every 10 chunks, so the frontend can render stage-by-stage UX such as "search complete → starting to generate the answer."
+</RevealOnScroll>
+
+On the client I combined a `ReadableStream` reader + line-buffering parser, a 5-minute timeout, and retries with 1·2·4-second exponential backoff. The core is a **global StreamManager** holding a `chatId → { AbortController, Promise }` map — the in-flight fetch stays alive even when the component unmounts, and when the user comes back to the chat, `ensureStreamCompletion` awaits the in-progress Promise so the correct answer reaches the cache.
+
+> Putting the AbortController's lifetime in a global manager instead of the component was the key decision. Route change ≠ request cancellation; change in user intent = request cancellation.
+
+On day 5 after the first release, I cut into my own code again. I deleted `StreamingContext` (52 LOC) + `streamingReducer` (109 LOC) + `streamingStorage` (74 LOC) — −235 LOC in total — and rewrote the hook at +278 / −291. I could see that state like **isPending · isStreaming · messageId** was being managed twice, alongside the React Query cache, and delaying the display of the first token; making cache mutations the single source of truth and removing the auxiliary layers reduced the perceived pending time.
+
+## Results
+
+- **6** SSE event types + an `event: close` termination signal, with progress emitted every 10 chunks.
+- **Zero** responses lost on navigation — global StreamManager + `ensureStreamCompletion`.
+- The redesign 5 days after the first release **deleted −235 LOC** of auxiliary state layers and rewrote the hook at +278 / −291.
+- Zombie pending guards — 3 retries / exponential backoff 1·2·4s / 5-minute timeout / 15-second safety timeout.
+- On the backend, working with an AI agent, I added a `StreamingResponse` built on `async for chunk in llm.astream(...)` on top of a teammate's FastAPI code, and set headers that avoid proxy buffering such as `X-Accel-Buffering: no` · `Cache-Control: no-transform` — keeping it consistent with the client.
+
+## What I Learned
+
+The biggest lesson was that **state lifetime is decided by the domain, not the component**. For long-running requests like SSE, the real termination signal isn't the component unmounting but "did the user change their intent?" Put the AbortController inside the component and a route change alone kills the response; put it in a global manager and it dies only when the user actually cancels.
+
+One more: *admitting the first design wasn't perfect and cutting it again within 5 days*. Context + Reducer + localStorage is a common pattern in the React ecosystem, but where a server cache already exists, it becomes double management. It's true that I *didn't see the "UI state = server cache state" principle at first and only realized it after release*, but admitting that quickly and cutting it turned out to be the faster path.

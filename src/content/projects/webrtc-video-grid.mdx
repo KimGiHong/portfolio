@@ -20,7 +20,7 @@ headlineMetric:
   unit: '개'
 highlights:
   - '50명 방 모바일 사용성 회복. 현재 페이지 외 참가자 SFU forward 차단으로 디코딩 부하 ~50개 → ~25개.'
-  - '화질 정책을 단일 pure-function 모듈로 통합. 입력 3종을 받아 해상도 헤드 버킷을 반환하는 구조로 if문 산재 종료.'
+  - '화질 정책을 단일 pure-function 모듈로 통합. 입력 3종을 받아 해상도 버킷을 반환하는 구조로 if문 산재 종료.'
   - 'Puppeteer fake-camera 봇을 자체 작성. burst/steady/churn 부하 p95 메트릭을 매 빌드 산출물로 외부 관찰.'
   - '신규 회귀 테스트 20건+. 정책 변경 시 그래프로 회귀를 감지할 수 있는 상태로.'
   - '백그라운드 탭 송수신 중단과 지수 백오프 재연결로 세션 복원성 확보.'
@@ -43,7 +43,7 @@ import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
   먼저 **수신을 페이지 단위로 자르는 일**부터 했습니다. 페이지 상태를 store 한 곳에 단일화하고, `setReceiverConstraints` modern API를 어댑터에 추가해 현재 페이지 참가자만 고해상도로 받게 했습니다.
 </RevealOnScroll>
 
-송신은 별도의 pure-function 모듈로 분리했습니다. 세 함수(수신 해상도 · 송신 해상도 · 강등 해상도 계산)가 dpr · 참가자 수 · connection-quality를 입력으로 받아 해상도 버킷을 반환합니다. 정책은 모듈 한 곳에서 결정되고, 어댑터는 결과만 적용합니다.
+화질 정책은 별도의 pure-function 모듈로 분리했습니다. 세 함수(수신 해상도 · 송신 해상도 · 강등 해상도 계산)가 dpr · 참가자 수 · connection-quality를 입력으로 받아 해상도 버킷을 반환합니다. 정책은 모듈 한 곳에서 결정되고, 어댑터는 결과만 적용합니다.
 
 > 산발적 if문 대신 하나의 테스트 가능한 함수. 튜닝은 함수의 입력을 바꾸는 일이 되고, 회귀는 테스트에서 잡힙니다.
 

@@ -1,14 +1,14 @@
 # 김기홍 · Portfolio
 
-[https://portfolio-kimgihongs-projects.vercel.app](https://portfolio-kimgihongs-projects.vercel.app)
+[https://kimgihong.vercel.app](https://kimgihong.vercel.app) · English: [https://kimgihong.vercel.app/en/](https://kimgihong.vercel.app/en/)
 
-프론트엔드 엔지니어 김기홍 (KimGiHong)의 개인 포트폴리오 사이트입니다. 한지(Korean mulberry paper) × Notion 톤의 에디토리얼 미감으로 제작했으며, 17개 사내 케이스 스터디를 5개 product magazine spread로 정리합니다.
+프론트엔드 엔지니어 김기홍 (KimGiHong)의 개인 포트폴리오 사이트입니다. 한지(Korean mulberry paper) × Notion 톤의 에디토리얼 미감으로 제작했으며, 27개 사내 케이스 스터디를 6개 product chapter로 정리합니다. 한국어(기본)와 영어(`/en`) 두 언어로 제공됩니다.
 
 ## 정직한 disclosure
 
 - **이 사이트의 코드는 Claude AI agent와의 페어 프로그래밍으로 작성됐습니다.** 본인은 디자인 방향 · 아키텍처 결정 · 코드 리뷰 · 빌드/검증을 담당했고, 라인-바이-라인 코드 입력은 대부분 AI agent와 함께 진행했습니다.
 - 이 워크플로는 본인이 회사에서 1년 넘게 production 코드에 적용해 온 표준 작업 방식과 동일합니다 (사이트의 `/about` 페이지 Talks 섹션에 관련 사내 세미나 자료 첨부).
-- 사이트의 17개 케이스 스터디 내용은 모두 사내 NDA로 코드가 비공개이며, 구체 메트릭·디버깅 과정·기술적 선택 이유는 인터뷰에서 자세히 공유 가능합니다.
+- 사이트의 27개 케이스 스터디 내용은 모두 사내 NDA로 코드가 비공개이며, 구체 메트릭·디버깅 과정·기술적 선택 이유는 인터뷰에서 자세히 공유 가능합니다.
 
 ## 기술 스택
 
@@ -17,6 +17,7 @@
 - **인터랙션**: React 19 islands + Motion (Framer Motion 후속)
 - **콘텐츠**: MDX + Astro Content Collections (Zod schema)
 - **타이포그래피**: Fraunces (영문 디스플레이) · Gowun Batang (한글 디스플레이) · Pretendard (본문) · JetBrains Mono
+- **다국어**: 한국어 루트 + `/en` 미러, `hreflang` 대체 링크, 언어별 sitemap
 - **PDF 출력**: `@media print` CSS — 이력서 페이지(`/resume`)는 브라우저 인쇄로 ATS-friendly PDF 출력 가능
 
 ## 인터랙티브 모먼트 3가지
@@ -40,16 +41,18 @@ npm run typecheck # Astro check (strict TS)
 ```
 src/
   content/
-    profile.ts                # 타입 안전한 프로필 데이터 (Korean/English)
-    projects/*.mdx            # 17 케이스 스터디 (MDX + frontmatter)
-    config.ts                 # Astro Content Collections schema
+    profile.ts                # 프로필 데이터 — 공통 사실 + ko/en 문안
+    products.ts               # 제품 챕터 순서·소개 (ko/en)
+    projects/*.mdx            # 27 케이스 스터디 (한국어 원본 — 순서·수치·기간의 단일 출처)
+    projects-en/*.mdx         # 영어 번역 (번역 필드만)
+  content.config.ts           # Astro Content Collections schema
+  i18n/index.ts               # 로케일 · 경로 헬퍼 · UI 문자열
+  lib/projects.ts             # 로케일별 케이스 병합 (번역 누락 시 한국어 fallback)
+  views/                      # 페이지 본문 (locale prop) — Home · About · Projects · ProjectDetail · Resume
   pages/
-    index.astro               # 홈 — hero + 3 featured chapter + about snippet
-    about.astro               # /about — about + skills + experience + talks + contact
-    projects/
-      index.astro             # /projects — 5 product magazine spread
-      [...slug].astro         # 케이스 상세
-    resume.astro              # /resume — print-optimized
+    index.astro · about.astro · resume.astro · projects/   # 한국어 라우트 (views 호출)
+    en/                       # 영어 라우트 (같은 views, locale="en")
+    404.astro                 # 한/영 공용
   components/
     layout/                   # BaseLayout · Header · Footer · Container
     ui/                       # SectionTitle · Divider · Chip · RevealOnScroll

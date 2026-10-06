@@ -1,0 +1,49 @@
+---
+title: 'A Video Grid That Survives 50-Person Meetings'
+summary: 'I restored mobile usability in 50-person meetings. I cut SFU reception down to page units, and consolidated quality decisions so that, instead of scattered if statements, they happen only in a single pure-function module that takes dpr, participant count, and connection quality as inputs.'
+teaser: 'Decoding load 50 → 25 streams, page-level SFU receive control + a single quality-policy module'
+headlineMetric:
+  label: 'Mobile decoding load in a 50-person meeting — before and after page-level SFU control'
+  unit: 'streams'
+highlights:
+  - 'Restored mobile usability in 50-person rooms. Blocking SFU forwarding for participants outside the current page cut decoding load from ~50 → ~25 streams.'
+  - 'Consolidated the quality policy into a single pure-function module. It takes 3 inputs and returns a resolution bucket, ending the sprawl of if statements.'
+  - 'Wrote my own Puppeteer fake-camera bots. p95 metrics under burst/steady/churn load are observable externally as an artifact of every build.'
+  - '20+ new regression tests. Policy changes can now be checked for regressions on a graph.'
+  - 'Session resilience through pausing send/receive in background tabs and reconnecting with exponential backoff.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Because we received every participant's tracks simultaneously, 50-person rooms were practically impossible on mobile and mid-range devices. The CPU and GPU couldn't handle 50 decodes at once, and mobile devices shut down from overheating.
+
+What made the problem harder was that *the quality-decision logic was scattered inside the adapter*. With no single place defining which resolution to use under which conditions, every round of tuning added more if statements, and regressions were frequent.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I started by **cutting reception down to page units**. I unified page state in a single place in the store, and added the modern `setReceiverConstraints` API to the adapter so that only participants on the current page are received at high resolution.
+</RevealOnScroll>
+
+I split the quality policy out into a separate pure-function module. Three functions (computing receive resolution · send resolution · degraded resolution) take dpr · participant count · connection-quality as inputs and return a resolution bucket. The policy is decided in one place, the module, and the adapter only applies the result.
+
+> One testable function instead of scattered if statements. Tuning becomes a matter of changing the function's inputs, and regressions get caught in tests.
+
+Screen sharing runs outside the policy as a separate track (1080p / 10–15fps + `contentHint`). Background tabs pause sending and receiving, and network recovery is handled with `navigator.onLine` plus exponential-backoff reconnection.
+
+I believed verification had to be observable from the outside. I wrote Puppeteer fake-camera bots and WebSocket bots myself, ran burst · steady · churn load in 6 · 17 · 25+ participant scenarios, and saved the simulcast layers, whether `setReceiverConstraints` was applied, and p95 metrics as JSON.
+
+## Results
+
+- Restored mobile usability in 50-person rooms. SFU forwarding blocked for participants outside the current page.
+- VP9 preferred + VP8 fallback. Dedicated 1080p · 10–15fps for screen sharing.
+- 20+ new regression tests covering page state, participant activation, the quality adapter, and VP9 / p2p off / bridge channel guards.
+- Load-bot artifacts make simulcast application and quality-policy results externally observable on every build.
+
+## What I Learned
+
+The more branching an area has, like WebRTC, the more the answer was to *treat policy as data and extract it into a function*. The adapter becomes a thin layer that only applies the *result* of the policy, and tests only need to hit the policy function.
+
+I was also reminded that verification has to be possible *from the outside*. Rather than trusting the SDK's internal state, I generated real send/receive traffic with fake-camera bots and tied the resulting metrics to build artifacts — and quality-policy changes started showing up on a graph.

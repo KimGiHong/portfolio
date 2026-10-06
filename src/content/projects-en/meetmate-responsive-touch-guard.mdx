@@ -1,0 +1,52 @@
+---
+title: 'MeetMate Web v4 Mobile/Tablet Responsive Overhaul — 280px Guarantee + Touch Target Gap Closed + Lobby Decomposition'
+summary: 'I lowered the guaranteed minimum width from 344px (Galaxy Z Fold 5) to 280px, and closed a policy gap where the 44px touch target rule was missing in the 695–822px tablet range. At the same time, I decomposed the lobby god component into flow hooks (428 → 327 LOC) and moved 6 window CustomEvent usages onto the project''s standard event bus.'
+teaser: 'Guaranteed minimum width 344 → 280px, touch target upper bound 694 → 822px, lobby container 428 → 327 LOC'
+headlineMetric:
+  label: 'Minimum viewport width guaranteed by the layout regression guard'
+  unit: 'px'
+highlights:
+  - 'Guaranteed minimum width **344px → 280px** — verified zero horizontal overflow with a Playwright regression script down through iPhone SE, WCAG reflow (320), and the Galaxy Fold cover screen (~280).'
+  - '44px touch target rule upper bound **694 → 822px** — closed the tablet gap where BottomSheet applied up to 822 but touch targets only up to 694, and directly raised sizes where a widget''s own min-size was beating the rule on specificity.'
+  - 'Extended the compact check from width alone → `pointer: coarse` + height awareness — landscape phones and iPad Pro now get the reduced UI, while touchscreen desktops are excluded. Safe-area insets applied to the footer, header, and panels.'
+  - 'Lobby container **428 → 327 LOC** — extracted entry/creation flow hooks + code-split the reservation subtree with `React.lazy`, window CustomEvent dispatch **6 places → 0** (unified on the event bus), hardcoded Korean reason messages → i18n keys.'
+  - 'Stopped the infinite scrollbar appear↔disappear oscillation with `scrollbar-gutter: stable`, and fixed a concurrent render race that rendered PDFs flipped 180° in narrow windows by ignoring same-size resize firings + canceling in-flight renders.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+v4 had been polished with desktop as the baseline, and as mobile and tablet users grew, regressions that split along screen width and input method came pouring in. On narrow phones, lobby button labels broke onto two lines, and the meeting room's 8 footer controls didn't fit on one row. On tablets, BottomSheet came up with mobile UX while touch targets stayed desktop-sized, making them hard to tap.
+
+Tracing the cause, the problem was less individual CSS bugs than *having multiple criteria*. Mobile detection used 504px, touch targets 694px, and BottomSheet 822px — each a different boundary — and the ranges in between were policy gaps. In the lobby, the logic was concentrated in one container, so even a single responsive fix had a wide blast radius.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First, I **set up a narrow-width regression guard.** Going below the previous minimum of 344px (Galaxy Z Fold 5) down to iPhone SE and WCAG reflow at 320px and the Galaxy Fold cover screen at ~280px, I ran login, sign-up, nickname, and lobby through Playwright scripts to verify zero horizontal overflow, input icon overlay positions, and lobby action buttons staying on one line. From then on, every responsive fix had to pass this guard.
+</RevealOnScroll>
+
+Next, I **aligned the boundaries into one.** I extended the 44px touch target rule up to 822px so it uses the same range as BottomSheet, and for widgets like the chat panel and input bar, whose own min-size beat the shared rule on specificity, I raised sizes directly under the compact + coarse condition. Conversely, the decorative icons in the login input fields were caught by the rule and grew from 16 → 44px, breaking the layout, so I made them an exception. The compact check, which used to look at width only, now uses `pointer: coarse` + height awareness, so landscape phones and iPad Pro get the reduced UI while touchscreen desktops stay as they were. I also unified the options dialog's fullscreen gate from 504 → the 822 compact criterion.
+
+> Most responsive bugs came not from a single line of CSS but from "the empty ranges between different breakpoints." Unifying the boundaries eliminated far more regressions than individual fixes did.
+
+For the mobile footer, I had shrunk the icons but reverted after feedback that they looked squashed; instead, I cut the inline controls from 7 → 5 core ones and moved screen sharing and raise hand into the ⋯ options, fitting one row at 344px while keeping 44px. On devices without `getDisplayMedia`, like iOS, I hide the screen sharing button using feature detection rather than the UA, and show a clear notice. I applied `env(safe-area-inset-*)` to the footer, header, and panels, and clamped BottomSheet's max-height by the keyboard inset.
+
+I also worked through the tricky layout bugs cause by cause. On the device setup page, in environments with classic scrollbars, "scrollbar appears → width shrinks by 15px → 16:9 video height shrinks → scrollbar disappears" repeated forever; I broke the feedback loop with `scrollbar-gutter: stable`. PDFs appearing flipped 180° only in narrow windows turned out to be a race where the initial `ResizeObserver` firing stacked a second render onto the same canvas, so I made it ignore same-size firings and cancel in-flight renders.
+
+In parallel with the responsive fixes, I **decomposed the lobby in 3 stages**. Stages 1 and 2 reinforced the duplicate-submit guard, landmarks and keyboard operability, and labels for icon-only buttons; stage 3 extracted the entry/creation flows into hooks and split the heavy reservation subtree out with `React.lazy` so it doesn't load for non-logged-in entry. I moved the 6 window CustomEvent usages that served as page-transition signals onto the project's standard event bus (confirming 0 remaining with an exhaustive grep), and replaced the entry-denied reasons that the shared API returned as plain Korean text with i18n keys.
+
+## Results
+
+- Guaranteed minimum width **344 → 280px**, with Playwright guards running continuously at 280·320·344px viewports.
+- 44px touch target upper bound **694 → 822px** — closed the 695–822px tablet gap and unified touch behavior across options, sheets, and member menus.
+- Mobile footer inline controls **7 → 5** + moved to ⋯ — fits one row at 344px without shrinking icons.
+- Lobby container **428 → 327 LOC**, window CustomEvent dispatch **6 places → 0**, reservation subtree split out lazily.
+- Fixed width-dependent regressions including scrollbar oscillation, 180° PDF flips, panel occlusion, and clipping at short heights; 2,323 tests passing, including the lobby's first unit tests (as of 2026.06.30).
+
+## What I Learned
+
+If you think of "responsive" as screen width alone, things keep leaking through on tablets and landscape phones. What actually shaped the user experience was the combination of width, height, input method (coarse/fine), and safe-area, and regressions only started to drop once I gathered that into a single compact check.
+
+Also, setting up the narrow-width guard first is what carried the next two months of work. With responsive fixes, fixing one screen often breaks another width, but with the 280/320/344 guards in place I could confirm "fixed" with numbers and move on.

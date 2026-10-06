@@ -1,0 +1,47 @@
+---
+title: 'Making Room for the Next Feature — Splitting 800-Line God Files by Domain'
+summary: 'I split god files that had grown past 800 lines during the early fast build into domain units, turning them into a place that could take new features — groups, documents, notes, VOD, presenter mode — with no extra modularization cost.'
+teaser: '+2,296 / −1,825 in a single commit, then 5 modes added at zero extra modularization cost'
+stack:
+  - TypeScript
+  - Zustand slice pattern
+  - React Native
+  - Domain service separation
+highlights:
+  - '+2,296 / −1,825 lines rearranged in a single commit. 13 new files, 4 existing ones slimmed down.'
+  - 'The 846-line conference domain split by responsibility into eventHandler and trackManager.'
+  - 'The 853-line WebSocket domain split into 6 services: connection · chat · layout · member · room · track.'
+  - 'MeetingBody broken into per-layout-mode hooks, with mode selection made only in a single selector.'
+  - 'Right after, 5 modes — groups, documents, VOD, notes, presenter — slotted in with no extra modularization cost.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+As a result of the first six months of fast building, a few files were carrying every responsibility themselves. The heaviest were 846 and 853 lines. Whenever I went to add a new feature (groups · documents · VOD · notes · presenter mode), I first *had to decide where it would even go*.
+
+The problem wasn't "the code is long" — it was "there's no place for the next feature to go."
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I split everything by domain in one pass. The meeting domain was cut by responsibility into an event handler and a track manager, and the WebSocket domain was made explicit as 6 services (connection · chat · layout · member · room · track).
+</RevealOnScroll>
+
+The meeting body component was broken into per-layout-mode hooks — grid · pinned · seminar · vad. Which mode to use is now decided in one place, a single selector. The member store was split into a data slice and a UI slice.
+
+> Splitting large files wasn't about reducing lines of code; it was about *naming things*. The moment you write down a file name, you decide what that file should take on and what it shouldn't.
+
+I bundled this work into a single PR and finished it in one go. Sometimes *a refactor that redraws the picture all at once* makes domain boundaries clearer than *a refactor done in many small cuts*.
+
+## Results
+
+- **+2,296 / −1,825 lines rearranged** in a single commit, 13 new files created, 4 existing ones slimmed down.
+- The 846-line meeting domain slimmed down by splitting it into an event handler and a track manager.
+- Right after, 5 modes — groups · documents · VOD · notes · presenter — came in **with no extra modularization cost**.
+- Four follow-up separations of responsibility — a download service, a device store, structural optimizations, and more — followed naturally.
+
+## What I Learned
+
+The real metric of a refactor is *which features came in right after, and at what cost*. The fact that groups · documents · VOD · notes slotted in right after the split without shaking the modules even once was *the payoff for naming things well*.

@@ -1,0 +1,52 @@
+---
+title: 'Lecture Replay Overhaul + Banner Management — Pinning Down a Server Defect by Measurement and Shipping in Revertible Units'
+summary: 'I traced 44 replay sessions stuck at zero watch time to 3 paths where the client never sent a pause signal, and fixed them. For banner management, where saves didn''t take effect, measurements in dev revealed a server defect that added a new row on every save (8 piled up for one target), and I carried it from workaround → confirming the server fix → removing the workaround. To be able to pull out immediately if an issue appeared right before a release, I shipped by feature: 4 reverts and 3 per-feature rollout rounds.'
+teaser: '3 root-cause paths behind 44 zero-watch-time sessions fixed, duplicate banner rows 8 → 1, 4 reverts and 3 per-feature rollout rounds'
+headlineMetric:
+  label: 'Setting rows piled up for a single banner target in dev'
+  unit: 'rows'
+highlights:
+  - 'Replay sessions stuck at zero watch time: **44** → narrowed the cause to **3 paths** where the client never sent a pause (closing with X, playing to the end, closing the tab) and fixed all of them. Closing the tab now sends with `keepalive`, plus pagehide handling for mobile Safari.'
+  - 'Banner "save succeeds but nothing changes" → measurements in dev confirmed a server defect: **a new row added on every save + reads returning the oldest row** (8 piled up for one target). Got it working first with a client workaround, then removed the workaround after verifying the server''s upsert fix by measurement.'
+  - 'Per-feature **4 reverts · 3 per-feature rollout rounds** — when an issue showed up right before a release, I pulled only the banner and replay-default features and shipped the rest, then reverted the revert to reapply them once the cause was fixed.'
+  - 'Replay UX overhaul — **10-second skip** with arrow keys and left/right double-tap, lecture time shown as the actual total video length (rounded up to the minute), select-all kept across pages, and a fix for the bug where deleting one person made the whole list disappear.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+In September, operational requests came in along two tracks. One was a **lecture replay overhaul** (list structure, managing the audience for limited visibility, player controls, and showing whether each student had watched). The other was letting admins **configure the strip banner at the bottom of the portal from an admin screen**, instead of changing its text in code every time.
+
+Both had the same symptom: "the client sent the right thing, but the result is wrong." In replays, students who watched to the end were still shown as "Not watched," and for the banner, saving showed "Configured" while the screen kept the old text. Both also had fixed release dates, so if an issue came up, I needed to be able to ship *without just that feature*.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  For replay watch time, **I started with the dev data.** There were 44 sessions left in a playing state, with no pause timestamp and zero accumulated watch time. The server only adds the time elapsed since playback started to the watch time when it receives a pause signal, and the client wasn't sending that signal on three paths. Closing the popup with X only closed the window (something subscribed to the stop event, but nothing published it), playing to the end only stopped locally, and closing the tab canceled the ordinary fetch during unload.
+</RevealOnScroll>
+
+I closed each of the three paths. Closing with X now sends the stop signal before closing, with a 2-second deadline and a 3-second forced close. Playing to the end now triggers a stop that includes the server-side pause, and I passed the handler through a ref so the effect closure uses the latest one. Closing the tab sends with the `keepalive` option, and I also registered pagehide for mobile Safari while preventing duplicate sends.
+
+For the banner, **I called the save API three times in a row and compared the responses**. The response id was different each time, and reads returned the oldest row. Saving wasn't updating — it was inserting. In dev, 8 rows had piled up for a single target. While waiting for the server fix, I added a workaround that deletes the target's settings before saving until none come back from a read (capped at 12 attempts), and if the save fails, it restores the previous value so the banner isn't left missing. There was a client-side cause too: every time the class list arrived late, the edit form was reset to the server values and wiped out whatever was being typed. I blocked that with a guard that applies only once per target.
+
+> When I suspected a server defect, I didn't just hand it off as "looks like a server problem" — I kept a record of repeating the same call and comparing the responses. That record became the evidence for the server fix, and later the criterion for deciding whether the workaround could be deleted.
+
+After the server switched to upsert, I verified it again the same way. Only after seeing that three saves returned the same response id, that every read returned the latest value, and that a single delete cleaned it up did I remove the workaround and the restore-on-failure logic.
+
+I ran releases so that **each feature could be pulled out on its own**. Whenever an issue showed up right before a release, I pulled banner management and the "replays hidden from students by default for new classes" feature with revert commits and shipped everything else as is. Once the cause was fixed, I reverted those reverts to reapply them. The hidden-by-default setting lived only in the form's initial values, so it could drop out of the saved data if the form state was reset; I fixed it to always be included at save time unless the admin had changed it explicitly, then reapplied it.
+
+For the replay UX, I changed the list to a row list and added 10-second skip with arrow keys and left/right double-tap (280ms) to the player. For lecture time, I fetch the video lengths for only the current page from a separate media service in a single request, sum them, and display the total rounded up to the minute. In the limited-visibility audience popup, selecting all on page 2 cleared the selections on page 1; I fixed that with an opt-in option that "merges the current page's ids into the existing selection," leaving the existing SMS screen's behavior unchanged.
+
+## Results
+
+- Fixed all **3 paths** behind replay sessions stuck at zero watch time (44 in dev) — closing with X, playing to the end, and closing the tab (`keepalive` + pagehide).
+- Measured the banner save defect → cleaned up the rows piled on one target from **8 → 1**, and removed the client workaround after confirming the server's upsert fix.
+- Kept the banner management feature (13 files, 1,840 lines added) and the replay default feature decoupled from the release schedule with **4 reverts · 3 per-feature rollout rounds**.
+- Replay 10-second skip, actual lecture time display, select-all kept across pages, and a fix for the list disappearing when an audience member was deleted.
+
+## What I Learned
+
+"The client sent the right thing" was only a hypothesis until measured. In replays, the client really wasn't sending the signal; with the banner, the server really was piling up rows. Either way, *repeating the same call and checking the stored data directly* was the fastest route, and that record served as evidence as-is when talking with the backend team.
+
+I also learned that a workaround **should go in with its removal condition already defined**. When I added the banner workaround, I noted "remove once the server switches to upsert," and on the day I verified the server fix the same way, I tore it out immediately. Reverts were the same: because I'd split things into small per-feature units, pulling them right before a release and putting them back in were both painless.

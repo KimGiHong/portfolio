@@ -5,7 +5,10 @@
  * Wrapped icons use InkLink so they share the ink-bleed underline language.
  */
 import InkLink from '@/components/effects/InkLink.astro';
-import { profile } from '@/content/profile';
+import { getProfile } from '@/content/profile';
+import { getLocaleFromPath } from '@/i18n';
+
+const profile = getProfile(getLocaleFromPath(Astro.url.pathname));
 
 const year = new Date().getFullYear();
 

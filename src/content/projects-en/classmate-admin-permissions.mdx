@@ -1,0 +1,48 @@
+---
+title: 'Back Office for a SaaS 4-Tier Version × 3-Service Permission Matrix'
+summary: 'A back office that edits 4 versions (Free · Basic · Premium · Enterprise) × 3 services (Q&A · community · conference) × N capabilities × 4-way creator permissions on a single screen. Owning the admin pages area within the team, I designed and implemented it down to company pagination, search and throttled updates (the backend was handled by a separate teammate).'
+teaser: '4 versions × 3 services × ~200 permission nodes, cascade editing on one screen'
+role: 'Frontend Engineer (Team)'
+highlights:
+  - '4 versions × 3 services × an average of 6 capabilities × 4-way creator role = **~200 editable permission nodes**, cascade-edited on a single page.'
+  - 'Modeled permissions as a **3-depth tree** of service → capability → creator; an enable toggle cascade-disables the capabilities beneath it.'
+  - 'Generalized the 4-way creator permission (all / host / member / none) mutual exclusion into 1 function that iterates over `creatorKeys`.'
+  - 'Infinite refresh of the company list absorbs server pages and real-time updates into the same code path via Map merging + reverse-chronological sort, throttled at 1s.'
+  - '**About 1.5k LOC** across 3 admin pages (menus · companies · users), **owning the admin area within the team**.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+ClassMate was an LMS product run as SaaS, so the sales and operations teams needed to adjust, per company, which modules were turned on and which roles could create what (e.g., allowing post creation for hosts only). Until then this was stuck at direct DB edits or a meager toggle UI, and every time a new company was onboarded, the operations team had to go through a backend engineer.
+
+The key was that *permissions weren't simple booleans*. A capability (e.g., "create post") can hold one of four creator permissions (all / host / member / none), bundles of capabilities are turned on or off per service, and bundles of services are in turn grouped into versions (Free/Basic/Premium/Enterprise). It was a domain that called for 3-depth tree modeling.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I modeled permissions as a **3-depth tree of service → capability → creator**. On one screen, an enable toggle automatically cascade-disables the capabilities beneath it, and the 4-way radio groups are mutually exclusive. Everything up to diff-loading server permissions into local settings on company selection was handled with a single reducer-less local state.
+</RevealOnScroll>
+
+I generalized the 4-way creator permission mutual-exclusion logic into a single function that iterates over `creatorKeys`. Instead of writing branches for each radio group, defining just the key array applies mutual exclusion automatically. When a new permission type is added, all it takes is adding to the key array.
+
+> In permission UI, *reducing branches was correctness itself*. With many branches, every fine-tuning request from the sales team adds more if statements, and those added if statements create new regressions.
+
+The company list refreshes in bulk with a 1s throttle + ID Map merging, the pagination display window is 10 pages, and search is throttled on Enter. Selecting a company loads its permissions immediately. I unified the API surface so applying changes takes a single request with the company ID + a settings snapshot — the per-company transaction has to be clear for there to be no partial-apply regressions.
+
+For versions (e.g., Free), modules that are disabled are blocked with an alert, enforcing sales rules at the UI level. I saw *guarding even against the operations team switching things on by mistake* as the back office's responsibility.
+
+## Results
+
+- **~200** permission nodes (4 versions × 3 services × an average of 6 capabilities × 4-way creator) handled on a single screen.
+- 3-depth tree model → enable-toggle cascade leaves 0 surface for *partial-activation regressions*.
+- 4-way mutual exclusion generalized — adding a new permission takes 0 lines of code changes, just an addition to the key array.
+- Company list throttled at **1s** + ID Map merging, pagination window of 10 pages.
+- **About 1.5k LOC across 3 admin pages (menus · companies · users), ~40 commits over 5 months, owning the admin area within the team**.
+
+## What I Learned
+
+The biggest lesson was that *in a permissions domain, the data model is the UI*. Model it as a 3-depth tree (service → capability → creator) and cascade toggles · mutual exclusion · bulk apply all fall naturally out of the data structure. A flat model piles branches into the UI; a tree model lets the UI finish with a single recursion.
+
+One more thing: the sense of responsibility that the back office must *guard even against the sales and operations teams misconfiguring things*. Small guards — blocking disabled modules with an alert in the Free version, enforcing capabilities through 4-way mutual exclusion — were what *fully detached* the operations team's fine-tuning cycle from the backend engineers' hands.

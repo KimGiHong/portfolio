@@ -1,0 +1,49 @@
+---
+title: 'LMS ↔ Video Classroom Window Message Bridge — Rebuilt on Identity-Based Trust After an Endlessly Loading Score Report Outage'
+summary: 'The day after a production outage in which score reports loaded endlessly because of a single domain missing from an allowlist, I rebuilt cross-window postMessage validation from hardcoded domains into three identity-based layers. Adding a new deployment environment no longer requires a code change; the reply target went from a wildcard to the requesting window''s origin, and receivers that had no validation were brought under the same policy. I also blocked duplicate answer submissions 0.06 seconds apart with a single-flight guard.'
+teaser: 'Hardcoded domains → three-layer identity-based validation, targetOrigin * → requesting origin, 0.06s duplicate submissions blocked'
+highlights:
+  - 'Cross-window message validation **one layer of domain allowlist → three identity-based layers** — decided by browser-guaranteed references: is this a window I opened, and am I that window''s opener? Zero code changes when adding a new deployment environment, and every previously accepted origin is preserved (a strict superset).'
+  - 'Score report PDF reply target **wildcard → the requesting window''s origin** — pinning `targetOrigin` closes the path by which a score report could leak to another window, and the submit-notification and go-to-score-report receivers, which had accepted messages without validation, now follow the same policy.'
+  - 'Answer **duplicate submissions 0.06s apart → single-flight per test** — if a submission is already in progress, no new request is sent and the same Promise is shared; re-entry guards on the submit buttons of all three test-taking screens (OMR, survey, attachment).'
+  - 'Defined 5 cross-window message types so that when a student submits in the video classroom, the LMS list switches to completed **without a refresh**, and the score report PDF can be viewed right from the classroom popup.'
+  - 'Documented the limits of the coupled-window design (fails if the originating window is closed, only works when both apps'' deployed versions match) and wrote up a **server-side pre-generation proposal for score report PDFs** as a discussion document for the backend team.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+The LMS web app runs live tests inside a video classroom (MeetMate) popup window. The two apps have different repositories and different release cycles, and the only way they talk to each other is the browser's cross-window `postMessage`. In late June a request came in — "show the score report as soon as the student submits in the classroom" — so I first wired up a flow in which the classroom window asks the LMS window for the score report PDF, and the LMS generates the PDF and sends it back.
+
+The problem was how messages were validated. At first the reply target was a wildcard, and the validation added later still depended on an *allowlist of domains*. On July 6, one production address was missing from that list, and the result was an outage in which score reports loaded endlessly without any error.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  On the day of the outage I restored service by adding the missing address, and the next day I redesigned validation **to decide based on the window's identity rather than its domain**. The decision has three layers. ① The LMS remembers the classroom windows it opened itself in a `WeakSet` and checks whether the message's `source` is the same window. This is independent of domain and survives redirects along the way. ② Reloading the LMS wipes out ①'s memory, so it also checks whether the sending window's opener is this window. That reference is guaranteed by the browser and cannot be spoofed. ③ The existing allowlist stays as a last safety net.
+</RevealOnScroll>
+
+During review I also considered an "allow anything under the same parent domain" approach, but if public-suffix detection (things like co.uk) is incomplete, unrelated domains can slip through, so I didn't use it. Every origin that used to pass stays in ③, which makes the new decision a *strict superset* of the old one. By construction, the change cannot block an existing environment.
+
+> The allowlist was a structure that "silently breaks if you miss one." After switching to identity-based checks, there is no code to change when environments are added.
+
+On the reply side, I pinned `targetOrigin` from a wildcard to *the origin of the window that sent the request*. I also routed the receivers for the "submission complete" notification and the "go to score report" message, which until then had accepted messages without validation, through the same entry point. I consolidated the messages into 5 types — submission complete, open score report, and PDF request / data / error — and on receiving submission complete, the list refreshes via a throttled refetch so it switches to "completed" without a page refresh.
+
+In late July, server logs showed **an incident where the same answers were saved twice, 0.06 seconds apart**. I added a per-test single-flight guard to the answer submission function: if a submission is already in progress, it doesn't send a new request and returns the same Promise instead. It releases as soon as the call finishes, so legitimate resubmission isn't blocked. On the submit buttons of the three test-taking screens — OMR, survey, and attachment — I added a separate re-entry guard based on a synchronous ref to block double taps as well. I aligned it with the same rules on the classroom app side.
+
+Finally, I documented the limits of the coupled-window design itself: it fails if the LMS window is closed, it only works when both apps' deployed versions match, and, as an emergency measure, the PDF generator is duplicated across both repositories. I turned a proposal — have the server pre-generate each student's PDF when statistics are processed after the deadline — into a discussion document for the backend team, covering the required data, permissions, and failure cases.
+
+## Results
+
+- Cross-window message validation: one layer of domain allowlist → **three identity-based layers**. Zero code changes when adding a new deployment environment; every previously accepted origin preserved.
+- Score report PDF reply target: wildcard → **the requesting window's origin**. The 2 receivers that had no validation now follow the same policy.
+- Duplicate answer submissions (0.06s apart) → **per-test single-flight + re-entry guards on all 3 submission screens**.
+- Submitting in the classroom → the LMS list reflects completion in real time, and the score report PDF can be viewed right from the classroom popup.
+- Wrote up the server-side score report PDF pre-generation proposal as a supporting document and handed it to the backend team.
+
+## What I Learned
+
+Validating `postMessage` by *where it came from (domain)* meant being set up to break every time an environment was added. Switching to *who sent it (is it a window I opened)* made the check stricter while actually reducing the operational burden. I also confirmed that if you design the new check as a superset of the old one, a change that tightens security doesn't introduce regressions.
+
+One more thing: the emergency fix and the structural fix had to be kept separate. On the day of the outage I stopped it with one line, the next day I eliminated the whole class of cause, and I handed off the remaining structural coupling as a document. Keeping those three steps apart let me clean things up without stopping production.

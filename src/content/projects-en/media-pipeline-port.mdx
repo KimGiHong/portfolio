@@ -1,0 +1,46 @@
+---
+title: 'Virtual Background + Voice Modulation Media Pipeline: Full v3 → v4 Port'
+summary: 'I turned host controls that had been switched off back into features used in live meetings. I brought 7 virtual background modes and 6 voice modulation presets to v3 parity, moved the 1.6MB WASM outside the bundle budget, and closed out production issues with 4 follow-up fixes.'
+teaser: '7 virtual background modes + 6 voice presets at v3 parity, 1.6MB WASM moved out of the bundle'
+highlights:
+  - 'Restored 7 virtual background modes and 6 voice modulation presets to v3 parity. Host controls went from OFF to usable live.'
+  - 'Added 32 new tests, all 1,558 passing. Merged with FSD boundary violations kept at 0.'
+  - 'Split the 1.6MB TFLite wasm into a separate fetch. Moved it outside the 1.3MB gzip dist bundle budget so the build guard passes.'
+  - 'Integrated only at the adapter boundary. Left the algorithms untouched and cut off just mode selection and track application, extending to 6/7 presets with no regressions.'
+  - 'Wrapped up with 4 production fixes. Deterministically shut down CSP, WASM SPA fallback, and VRM initialization race issues.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+In the early v4 build, the virtual background and voice modulation UI only had working toggles — the actual media transformation wasn't wired up. The host controls were left as a "stub you could click and nothing more."
+
+v3 had a proven pipeline, but it used a single boolean and a single chipmunk pitch mode, which didn't match v4's 6-preset UI (male / female / robot / helium / deep / none). It needed not a simple copy but *a port that redraws the boundaries*.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I modularized the v3 algorithms and moved them over as-is. For voice modulation, I preserved the ScriptProcessor ring buffer + interpolation + biquad filter + wet/dry structure, and externalized only the mode decision into a preset table.
+</RevealOnScroll>
+
+Each of the 6 presets has its own modulation parameters — male (-4 semitones) · female (+4) · robot (-2 + 30Hz ring modulation) · helium (+8) · deep (-8) · passthrough.
+
+For the virtual background, I carried over v3's proven pipeline as-is — 30fps timer worker → offscreen video → TFLite WASM inference → mask rendering. I restored parity for the 7 modes (blur · half blur · image · avatar blur · VRM avatar, etc.), and the VRM 3D avatar takes face landmarks via `@pixiv/three-vrm` + `kalidokit` to map facial expressions.
+
+> Integration happens only at the adapter boundary. Two methods (apply voice preset / apply virtual background) apply the policy result to the track, and if the mic or camera is off, they warn and return gracefully.
+
+I closed out the issues that surfaced in production with separate fix commits: the worker being blocked because `worker-src blob:` was missing from the CSP header, the WASM loader colliding with the SPA fallback and returning 404, the missing Canvas `willReadFrequently` hint, and the VRM initialization race, which I shut down deterministically with a ready flag.
+
+## Results
+
+- +32 new tests, all 1,558 passing. Merged with a clean typecheck and FSD boundary violations kept at 0.
+- Kept WebSocket broadcast compatibility while completing the actual media transformation on the local track.
+- Split the first TFLite load (1.6MB wasm + 245KB model) into a direct fetch, moving it outside the 1.3MB gzip dist bundle budget.
+- Confirmed v3 parity for 7 virtual background modes + 6 voice presets → hosts can use them in live meetings.
+
+## What I Learned
+
+When porting a proven pipeline, *leaving the algorithms alone and redrawing only the boundaries* was the safest approach. By leaving the core signal processing untouched and cutting off only mode selection and track application at the adapter, extending to 6/7 presets came in naturally without introducing regressions.
+
+One more thing: *consciously picking out which assets should live outside the bundle budget* turned out to matter more than expected. Putting the 1.6MB wasm in the bundle breaks the budget immediately, but pulling it out into an external fetch collides with the SPA fallback. Closing out the small production issues in between with fix commits was ultimately the dividing line between "a feature people use" and "a toggle that's switched off."

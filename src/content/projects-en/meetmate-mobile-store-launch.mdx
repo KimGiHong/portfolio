@@ -1,0 +1,53 @@
+---
+title: 'From First Store Launch to 1.0.5 — Slimming the App and Handling App Review'
+summary: 'I launched MeetMate mobile on the App Store and Google Play for the first time, then shipped continuously for 5 weeks, from 1.0.0 (build 10) to 1.0.5 (build 29). Turning on R8 for the first time cut the Android DEX from 22.95MB to 5.60MB (download −30.6%), and Hermes bytecode shrank in two rounds, by −22% and −20.6%. I removed rejection triggers before submitting, and the rejection we did get was closed out with a reply, without re-uploading the binary.'
+teaser: 'DEX 22.95 → 5.60MB, download −30.6%, Hermes −22% · −20.6%, builds 10 → 29 in 5 weeks'
+headlineMetric:
+  label: 'Android uncompressed DEX size (before and after R8)'
+  unit: 'MB'
+highlights:
+  - 'Android DEX **22.95MB → 5.60MB** — turned on R8 full mode for the first time, keeping only the keep rules that were strictly necessary, for a −30.6% download size. This also took the app out of Play Console''s app-optimization warning range (DEX over 10MB).'
+  - 'Hermes bytecode cut in 2 stages — removing unused dependencies gave **−22%**, and replacing a barrel import that shipped all 1,767 icons with one that re-exports only the 85 actually used cut a further **−20.6%** (9.03MB → 7.17MB).'
+  - '**Builds 10 → 29** in 5 weeks, shipping 1.0.0 → 1.0.5 back to back — I removed the `UIBackgroundModes` voip declaration, a textbook rejection reason, before submitting, and closed out the rejection we did get (Guideline 2.3.10) and an information request (2.1) with replies, without re-uploading the binary.'
+  - 'Dangerous permissions injected by libraries **4 → 0**, plus an in-app account deletion path (App Review 5.1.1(v)) and targetSdk 36 edge-to-edge support, clearing the store-requirement blockers.'
+  - 'Locked down release hygiene with contract tests — I found, by measuring it, a path through which an IPA built with the old bundle ID could get uploaded, and closed it; store screenshots are captured automatically by UI tests that drive the app through the accessibility tree.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Right after overhauling the mobile app to match the web renewal, I went straight into preparing the first store launch. But just before launch, Play Console flagged the *app optimization* item. The uncompressed DEX was 22.95MB, and R8 had never once been turned on. Metro doesn't tree-shake, so importing the icon library through a barrel was pulling every icon into the bundle, including ones we never used.
+
+App Review had plenty of risk too. The iOS Info.plist declared a voip background mode that did nothing functionally, and the review notes spelled out the reason for it. The merged Android manifest contained biometric, boot-receiver, and exact-alarm permissions the app didn't use, brought in through libraries. There was also no account deletion path.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First, I **shrank the Android binary**. I turned on R8 full mode and resource shrinking, and left keep rules to the consumer rules each library already ships. The rules I added myself were limited to spots accessed only via reflection, which R8 can't detect. Keeping things wholesale lowers the optimization rate. To reproduce the real Play delivery path, I extracted split APKs from the AAB and used Maestro to verify everything from login to joining a meeting. The result: DEX 22.95 → 5.60MB, download −30.6%.
+</RevealOnScroll>
+
+For the JS bundle, I **measured with the actual hermesc before cutting**. A single line assigning an unused SDK was dragging in 597KB, and a single throttle was shipping all of lodash. Removing these gave Hermes −22%. For icons, I switched to a barrel that deep-imports and re-exports only the 85 actually used, cutting a further −20.6%. The 9 aliased icons that naming rules alone couldn't resolve were locked down with a test that compares them against the originals, down to the actually rendered SVG shapes.
+
+> Regressions where an icon "quietly renders as a different shape" are hard for a human to catch by eye. So I made the contract test check against the entire original barrel table.
+
+iOS had no missing step equivalent to R8. So I spelled out 11 hidden defaults in the build settings and only actually changed Swift whole module. Measuring showed that 47.8% of the 33MB IPA was symbol files that never reach users; the actual download was about 17MB. Following the principle of *not claiming gains that don't exist*, I reverted LTO and the asset options, whose effect couldn't be measured.
+
+**For App Review, I went the route of removing rejection triggers in advance**. I deleted the voip background mode together with the review note explaining it, and for the 4 dangerous permissions libraries were adding, I removed them or capped them while measuring the merged manifest output. For in-app account deletion, I confirmed that the server actually *deactivates* the account, then wrote the confirmation dialog copy to match the facts. The rejection we still received (2.3.10, one line in the app description that named another platform) was handled by revising the copy and replying.
+
+Finally, I **closed the traps in the release path with tests**. After the app was renamed, the upload script was pointing at an old IPA with the previous bundle ID left in the same location; I changed it to dynamically pick the most recent build artifact and fail immediately if there is none. Store screenshots are captured automatically by an XCUITest target that drives the screens through the accessibility tree, for iPhone 6.9" and iPad 13".
+
+## Results
+
+- Android DEX **22.95MB → 5.60MB**, download **−30.6%**, 0 R8 exceptions.
+- Hermes bytecode **−22%** (unused dependencies removed), then a further **−20.6%** (icon barrel 1,767 → 85).
+- 11 iOS build settings made explicit, crash symbolication guaranteed. Of the 33MB IPA, the actual download is about 17MB.
+- After the first launch at 1.0.0 (build 10), shipped continuously for 5 weeks up to 1.0.5 (build 29).
+- Dangerous permissions **4 → 0**, in-app account deletion, targetSdk 36 edge-to-edge support.
+- 1 rejection and 1 information request resolved without re-uploading the binary.
+
+## What I Learned
+
+Pre-launch optimization only meant something *when the measurement path matched the real delivery path*. Something can pass on a universal APK and still break on the split APKs Play actually delivers, so extracting the splits from the AAB myself and verifying them was what let me turn on R8 with confidence.
+
+App Review was similar. Most rejections come from *places where the app declares things it doesn't actually do*: an unused background mode, unused permissions, confirmation dialog copy that doesn't match reality. Aligning declarations with the actual implementation, and locking that state down with tests so it can't drift again, was the cheapest way to reduce rejections.

@@ -1,0 +1,48 @@
+---
+title: 'An RN Video Grid That Holds Up in 100-Person Meetings'
+summary: 'With 50–100 participants joining at once, our RN video conferencing app showed black screens on page transitions and 100+ unnecessary re-renders per minute. I rewrote it starting from the algorithmic complexity of the hot paths and brought it back to a normally usable state.'
+teaser: 'Comparisons 10,000 → 100, addTrack 100 → 1–2 batches, page-transition black screens eliminated'
+headlineMetric:
+  label: 'Hot-path comparisons when 100 participants join at once'
+  unit: 'comparisons'
+highlights:
+  - 'Hot-path comparisons on a 100-participant join: 10,000 → 100. Introduced Map indexes to go from O(n) → O(1).'
+  - 'Join-storm throughput: 100 individual `addTrack` calls → 1–2 batched calls. Micro-batched so the work finishes within a single frame.'
+  - 'Page-transition black screens eliminated. Bidirectional prefetching and a shorter debounce made responses 150ms faster.'
+  - 'React.memo on 5 key components; 8 whole-store subscriptions split into selectors.'
+  - 'Redesigned SFU `lastN` and quality tiers by participant-count band. ≤9 people get 720p, auto-downgrading to 180p at 26 or more.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+As meetings grew to 50–100 participants, the RN client started to wobble. Every join storm caused long black screens on page transitions, a single mute re-rendered the entire screen, and we were observing 100+ unnecessary re-renders per minute on the hot path.
+
+What made it harder was that track events used an O(n²) structure that linearly scanned every member. 100 participants joining = 100 tracks × 100 participants compared = 10,000 comparisons, repeated on every join event.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I started by **changing the shape of the data structures**. I added an auxiliary Map index to both the member store and the track store, turning frequently called lookups from O(n) into O(1).
+</RevealOnScroll>
+
+On the re-render side, I split whole-store subscriptions into selector-level ones (8 places). I wrapped the 5 key components — video, header, footer, chat, and participants — in `React.memo`, and where needed, spelled out prop equality with custom comparison functions.
+
+> Instead of receiving 100 joins as 100 individual `addTrack` callbacks, I micro-batched them so they're delivered in 1–2 calls. So the work finishes within a single frame.
+
+I fixed the page-transition black screens in two ways. I redesigned SFU `lastN` by participant-count band (≤9 people 720p, 26 or more 180p), and prefetched low-resolution tracks bidirectionally — not just for the current page but for the previous and next pages too. I cut the transition debounce from 250ms → 100ms, shortening perceived response time by 150ms.
+
+## Results
+
+- Hot-path comparisons on a 100-participant join: **10,000 → 100**.
+- Join-storm throughput: 100 individual `addTrack` calls → **1–2 batched calls**.
+- All member and track lookup functions moved from **O(n) → O(1)**.
+- Page-transition black screens → eliminated after bidirectional prefetching. Debounce 250 → 100ms, **150ms faster response**.
+- Re-render scope on mute / camera toggle — narrowed from the entire screen to the single affected video cell.
+
+## What I Learned
+
+The biggest lesson from performance work was *to leave behind measurable proof of itself*. "It's slow" is an unverifiable report, but "comparisons 10k → 100" is a baseline the next person can use to catch a regression. This is when I picked up the habit of pinning the *algorithmic complexity* as a comment on every hot path.
+
+One more thing: in an RN environment, *one level of data structure → one level of memoization → one level of resource policy* need to be bundled together with equal weight to have an effect. With only the Map index, the re-renders survive; with only `React.memo`, the hot path survives; with only `lastN`, the client-side cost survives. This work confirmed that unless all three layers move together, none of them is enough on its own.

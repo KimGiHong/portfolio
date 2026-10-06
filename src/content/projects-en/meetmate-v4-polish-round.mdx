@@ -1,0 +1,54 @@
+---
+title: 'MeetMate v4 Polish Round — God File Split + Web Vitals Measurement Infrastructure + Regression Guards'
+summary: 'A one-week polish round run right after finishing v4 in a month and removing 89k lines of v3. I split the god files by domain — mateBridge 2,167 → 64 and jitsiAdapter 2,568 → 101 LOC — into a shape that could be memoized, built my own Web Vitals measurement infrastructure, then cleaned up the CLS algorithm, bundles, fonts, and Zustand call patterns in a single round and locked a perf-gate into CI.'
+teaser: 'God file 2,167 → 64 LOC, CLS 0.000, font woff2 -65.4%, Zustand hook calls -43%'
+headlineMetric:
+  label: 'mateBridge god file LOC (before and after the domain split)'
+  unit: 'LOC'
+highlights:
+  - 'Domain split — mateBridge **2,167 → 64 LOC** (-97%), jitsiAdapter **2,568 → 101 LOC** (-96%), RoomContainer 1,465 → 365 LOC + 21 hooks extracted. Rollup circular deps 12 → 0.'
+  - 'Built my own Web Vitals measurement infrastructure — Playwright + Chromium DevTools Protocol, multi-user simulation with FakeRemoteTrack (N=4·25·26·50) plus cold join + churn scenarios. **Zero external backend dependencies**.'
+  - 'CLS algorithm fixed — `useMemo` + CSS containment + GPU layer promotion + grid hysteresis ladder + min-2 floor. Confirmed **CLS 0.000** in the cold join + broadcast churn scenario.'
+  - 'Bundle, font, and state optimization — Vite manualChunks + React Compiler ON + Router preload intent. Pretendard/SUITE Korean subset of KSX1001 + characters actually in use (**woff2 -65.4%**). `useShallow` + combined selectors on 5 hot Zustand components (**store hook calls 28 → 16, -43%**).'
+  - 'E2E + 14 visual regression baselines (`toHaveScreenshot`) + axe-core + Claude vision focus checks + WCAG AA color contrast bundled into a Bitbucket Pipelines **perf-gate** as an automatic per-PR regression guard.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+Right after finishing v4 in a month and removing 89,724 lines of v3, I re-measured Lighthouse and Web Vitals and found CLS wobbling on cold join, with layout shift still left over from font and bundle loading. What made it harder was that *the measurement infrastructure itself depended on an external backend*, so regressions couldn't be caught until they reached production.
+
+On top of that, as a by-product of the fast v4 build, `mateBridge` (2,167 LOC) and `jitsiAdapter` (2,568 LOC) had grown into god files, which made it hard to even draw component memoization boundaries.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First, I **split the two god files by domain**. mateBridge went 2,167 → 64 LOC and jitsiAdapter 2,568 → 101 LOC, keeping only the core and carving everything else out into domain modules. I also slimmed RoomContainer from 1,465 → 365 LOC and extracted 21 hooks. Rollup circular dependencies went 12 → 0.
+</RevealOnScroll>
+
+Next, I **rebuilt the measurement infrastructure from the ground up**. I sampled Web Vitals (CLS · LCP · INP · TTI) directly through Playwright + Chromium DevTools Protocol, and built a FakeRemoteTrack to simulate multi-user scenarios (N=4·25·26·50) without an external backend. With a combined cold join + broadcast churn scenario, I could now measure even *CLS under churn as it happens in production*.
+
+For the CLS algorithm, I stabilized the `MembersLayout` styles with `useMemo` and added CSS containment + GPU layer promotion. Grid reflow was tidied up with a hysteresis ladder + min-2 floor + high-water mark to absorb quality fluctuation as multiple users join and leave.
+
+> If your measurement infrastructure is tied to external dependencies, regressions only get caught after they reach production. Self-contained measurement was the starting point for the entire perf round.
+
+I cleaned up bundles, fonts, and state in one round: Vite manualChunks + sourcemaps + font preload + React Compiler on by default + Router preload intent. For the Korean (Hangul) fonts, I subset Pretendard/SUITE to KSX1001 + only the characters actually used, cutting woff2 by 65.4%. On the 5 hot Zustand components, `useShallow` + combined selectors brought store hook calls from 28 → 16 (-43%).
+
+Finally, I bundled the regression guards together: a comprehensive E2E workflow + automation of the host's 12 dialogs + 6 mobile BottomSheet cases + 14 visual regression baselines (`toHaveScreenshot`) + axe-core + Claude vision focus checks + WCAG AA color contrast, all locked into a Bitbucket Pipelines **perf-gate** as an automatic per-PR regression guard.
+
+## Results
+
+- Domain split — mateBridge **2,167 → 64 LOC** (-97%), jitsiAdapter **2,568 → 101 LOC** (-96%), RoomContainer 1,465 → 365 LOC + 21 hooks extracted.
+- Rollup circular deps **12 → 0**, pre-existing biome errors **29 → 0** + warnings **70 → 0**.
+- Web Vitals measurement infrastructure — Playwright + CDP, multi-user simulation built on FakeRemoteTrack. Zero external backend dependencies.
+- CLS algorithm fixed — **CLS 0.000** in the cold join + churn scenario.
+- Font woff2 **-65.4%** (KSX1001 + subset of characters actually in use).
+- Store hook calls on hot Zustand components **28 → 16 (-43%)**.
+- E2E + 14 visual regression baselines + axe-core + Claude vision focus bundled into a Bitbucket Pipelines perf-gate as an automatic per-PR regression guard.
+
+## What I Learned
+
+It reconfirmed the principle that *optimization starts after measurement*. If the measurement infrastructure is tied to external dependencies, regressions are only caught after they reach production — and by then it's already too late. Making the multi-user simulation self-contained with Playwright + CDP + FakeRemoteTrack was the real starting point of the whole polish round.
+
+One more thing: *god file split → memoization → measurement → fixes → CI guard* doesn't pay off if you get the order wrong. Without splitting the big files you can't draw useMemo boundaries, and without boundaries perf measurement only picks up noise. Deliberately chaining the five steps and finishing them as one round within a week is what *actually changed how it felt to real users*.

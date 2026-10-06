@@ -1,0 +1,42 @@
+---
+title: 'ESLint · Prettier · Accessibility — Solo Code-Quality Guardrails Maintained for 12 Months'
+summary: 'In the NMS-Web frontend, which had grown to nearly 800 commits with folder structure and import order drifting from page to page, I introduced — as the sole frontend engineer — ESLint · Prettier · a11y · VS Code workspace settings bundled with a convention document of about 5,000 lines, then maintained and evolved them for a year.'
+teaser: '~5,000-line conventions + ESLint/Prettier/a11y guards, kept running for 12 months'
+highlights:
+  - 'Rebuilt the ESLint config from airbnb onto a `next/core-web-vitals` base. Resolved conflicts with Next.js 14 App Router patterns.'
+  - 'Wrote a coding convention document of about 5,000 lines. The single source of truth for file structure · naming · types · state management · quality rules.'
+  - '`lint:fix` · `format` · `format:check` · `type-check` scripts and VS Code workspace settings apply the rules automatically at write time.'
+  - 'Cleared jsx-a11y warnings in bulk — 0 on the incidents · status management · login pages. Missing `useEffect` dependencies cleaned up along the way.'
+  - 'A year later (2026.04), the same owner overhauled the guards. Not set-and-forget, but kept in a state that has run for 12 months.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+NMS-Web was a codebase that had grown to nearly 800 commits with a single frontend engineer. ESLint, which had started from airbnb rules, frequently clashed with Next.js 14 App Router patterns, hooks dependency rules and a11y rules, creating a lot of noise in builds and reviews, and folder structure and import order differed slightly from page to page.
+
+The problem was that *this couldn't be solved by fixing just one spot*. Rules, tooling, documentation and IDE settings all had to move together.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  Starting with the ESLint config, I rebuilt it as `next/core-web-vitals + @typescript-eslint/recommended + prettier`, clearing out the airbnb rules that collided with App Router patterns. The direction was not to resolve conflicts one by one but to *swap out the base of the rules entirely*.
+</RevealOnScroll>
+
+I bundled write-time automation. I organized the `lint:fix` · `format` · `format:check` · `lint:format` · `type-check` scripts, and used `.prettierignore` and VS Code workspace settings so the same rules apply inside the IDE too. Going page by page, I cleared jsx-a11y warnings (button type, label-control association, click-events-have-key-events) and missing `useEffect` dependencies in bulk.
+
+> Installing the tools alone didn't keep the conventions alive. By writing a convention document of about 5,000 lines alongside them and recording *why each rule exists* in one place, new rules added in later work started accumulating in that same place too.
+
+## Results
+
+- Many lint warnings at build time → caught immediately at write time in CI and the IDE.
+- jsx-a11y warnings cleared in bulk — **0** on the incidents · status management · login pages.
+- The convention document became the single source of truth, so new and refactored code follows the same import order and the same file structure.
+- A year later (2026.04), the same owner overhauled the ESLint config. The guardrails are **still alive after 12 months of operation**.
+
+## What I Learned
+
+The biggest lesson from code-quality guardrails was that *installing the tools isn't enough*. If you don't bundle ESLint · Prettier · VS Code settings together and pair them with a convention document explaining *why each rule exists*, the guardrails collapse the moment someone asks, six months later, "why is this rule here?"
+
+One more thing: guards stay alive only when there's someone *maintaining* them for the year. Not installing and forgetting — a guardrail's real lifespan ran until that person came back a year later to touch the config again.

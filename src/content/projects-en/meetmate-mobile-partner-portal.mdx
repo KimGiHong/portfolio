@@ -1,0 +1,53 @@
+---
+title: 'One-Week Education Portal Integration — Deep-Link Entry, Tests and Score Reports, Recording Blocking'
+summary: 'In one week, I added an entry path to the app that lets users come in from an external education portal with a single link, skip login and the lobby, and go straight into the classroom. I moved live tests, mock exams, 1:1 live sessions, and score reports — previously web-only — to native, and matched the score report PDF byte for byte with the web generator. Device recording blocking took the share of black pixels in recordings from 0% to 99.7% while keeping in-app screen sharing working, and I later extended the same approach to regular meetings.'
+teaser: 'Black pixels in recordings 0% → 99.7%, score report PDF byte-identical to web, 66 deep-link tests'
+headlineMetric:
+  label: 'Share of black pixels in device screen recordings (before and after blocking)'
+  unit: '%'
+highlights:
+  - 'Black pixels in device recordings **0% → 99.7%** — blocked with `FLAG_SECURE` on Android and, on iOS, a full-screen cover shown whenever capture is detected. Blocking is lifted only while I''m sharing my own screen, so in-app screen sharing keeps working (40.5% while sharing, with the meeting screen visible normally).'
+  - 'Score report PDF **byte-identical** to the web generator — I dropped the native-table approach and moved the web jsPDF layout over unmodified. Tests confirm that, given the same real data, the output is identical apart from the generation timestamp and ID.'
+  - '**Zero-step entry** past login and the lobby — a single portal deep link goes straight to the device check screen. The external session lives only in memory, the existing regular login is left untouched, and the original login is restored when it ends (66 tests covering parser fuzzing, session lifetime, and 401 policy).'
+  - 'Moved **live tests, mock exams, and 1:1 live sessions**, previously web-only, to native — added 60-second autosave, per-question timers, and auto-submit on expiry, and tied the expiry watcher to the service lifetime so it keeps running even when the sheet is collapsed.'
+  - 'Screen sharing quality setting **fixed at 5fps → 5/15/30 actually applied** — values are passed to the separate-process iOS broadcast extension via App Group. On the instructor tile in the student view, I added a leak-tracing watermark that briefly shows the viewer''s name at a random position.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+A partner education portal that runs college-entrance-exam courses decided to use MeetMate as its classroom. The web already had the portal-specific features (live tests, mock exams, score reports, 1:1 live queue), but the mobile app had none of them. When a student tapped a lecture in the portal, the app made them start over from the login screen.
+
+There were two more requirements. Phone screen recording had to be blocked so course materials wouldn't leak, while still keeping the ability for instructors to share their screen from the app. The problem was that *device recording and in-app screen sharing use the same capture path at the OS level*.
+
+## Approach
+
+<RevealOnScroll client:visible>
+  First, I built the **entry path**. Portal deep links are strictly validated: links that aren't ours are ignored, and links whose contents don't match show a failure screen. The external session is injected only into memory, not into persistent storage. The existing regular login is left as is and restored from a snapshot when the session ends. Even a 401 in the external session doesn't wipe the regular login. On cold start, the initial URL is part of the app-ready condition, and links that arrive while already in a meeting are ignored.
+</RevealOnScroll>
+
+**Tests and mock exams carry over the web contract as is, with the rules split out into pure functions**. Rules like sheet merging, elective subjects, the submission payload, and answer keys were made testable without UI. The 60-second autosave, per-question timers (which start when a question becomes visible, pause in the background, and resume on return), and auto-submit on expiry live in the service layer. At first I put the expiry watcher in the sheet component, but when time ran out with the sheet collapsed, the timer froze at 00:00:00. So I moved the watcher to the service lifetime.
+
+I initially drew the score report as a native table. But following the decision that "it has to be the same file as the web one," I moved the web jsPDF layout over without touching it. I polyfilled atob/btoa, which Hermes lacks, and the font is downloaded once and cached. After verifying **byte equivalence** with the same real data, I deleted the native table.
+
+> From the OS's point of view, blocking screen recording and screen sharing are the same act. So instead of designing them separately, I made whether to block decided in one place.
+
+**Recording blocking** relied on different tools on each platform. Android sets FLAG_SECURE on the window, but because the flag is per-window, it has to be set again whenever the activity is recreated, as on rotation. Miss that, and simply rotating the screen once opens a hole. iOS has no API to block recording, so the app covers the entire screen whenever capture is detected. The final blocking decision is computed in one place — "blocked by policy and I'm not sharing" — and it's lifted just before sharing starts and reapplied when sharing ends or fails. I measured the share of black pixels at each stage with emulator screencap: normal 0%, blocked 99.7%, while I'm sharing 40.5%, after sharing ends 99.7%, after the session ends 0%.
+
+I cleaned up the remaining gaps too. The screen sharing quality setting, which was saved but whose actual output was fixed at 5fps, is now wired to the actual output cap. Instructor and TA self-views were excluded from mirroring so writing on the board doesn't appear flipped, and I added a watermark to the instructor tile in the student view. Portal branching wasn't scattered across components but consolidated into a policy field and a single pure function. When regular meetings also needed recording blocking a week later, I could extend it just by changing the policy value from on/off to a *scope* (off, during meetings, always). Regular meetings measured lobby 0%, device check 100%, meeting room 99.7%, lobby after leaving 0%.
+
+## Results
+
+- A portal deep link goes straight to the device check screen, without login or the lobby. External session separated from the regular login (66 tests).
+- Ported live tests, surveys, file attachments, dedicated mock exam screens, and the 1:1 live queue to native, and verified every student and instructor flow on devices.
+- Score report PDF byte-identical to the web generator.
+- Device recording blocking: **0% → 99.7%** black pixels, with in-app screen sharing preserved. Extended to regular meetings.
+- Screen sharing quality 5/15/30fps actually applied, self-view mirroring exception, leak-tracing watermark on the instructor tile.
+- Tests 1,883 → 2,030, 0 new tsc errors.
+
+## What I Learned
+
+*When the result has to be identical, don't rebuild it — move it over as is.* While I was redrawing the score report as a native table, differences from the web kept appearing; only after moving the web generator over unchanged could I prove "it's the same as web" with a byte-comparison test.
+
+Also, consolidating the partner-specific requirements into a single policy field, rather than scattering them as component branches, paid off a week later. When regular meetings also needed recording blocking, it was done just by widening the range of the policy value, without building a new feature.

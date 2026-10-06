@@ -1,0 +1,53 @@
+---
+title: 'MeetMate Web v4 Meeting Room UX Redesign — Google Meet–Style Pre-Join · Overflow Menus · Document Sharing PiP'
+summary: 'I merged the pages between an invite link and the meeting room from 2 → 1, and gathered meeting controls that had been scattered across header toggles and a right sidebar into the footer with a single reusable overflow menu kit. For document sharing, I turned the video strip that permanently took up 122px into a draggable PiP so the content can use the full height.'
+teaser: 'Pre-join pages 2 → 1, document sharing fixed strip 122px → 0, idle prefetch of 23 option sub-panels'
+headlineMetric:
+  label: 'Pages between an invite link and entering the meeting room'
+  unit: 'pages'
+highlights:
+  - 'Entry flow **nickname → device setup (2 pages) → unified pre-join (1 page)** — a `Permissions API`–based permission modal + preview, device chips, and name input on one screen. Refreshing mid-meeting now leads to a 1-click rejoin via the same room''s pre-join instead of the lobby.'
+  - 'Document sharing **permanent 122px video strip → 0** — moved into a draggable floating PiP so content uses the full height. The remote track receive contract stays intact (moved, not removed).'
+  - 'One reusable anchored menu kit (portal · positioning · focus-trap · Esc/outside click · arrow keys · menu role) unifies the share menu, meeting options, view adjustments, and mic/camera device switching — **2 header-center mode/category toggles removed**.'
+  - 'Eased the first-open delay of option sub-panels (measured up to **1,026ms**) with idle prefetch of 23 lazy chunks + skeletons.'
+  - 'Keyboard, wheel, and trackpad page navigation in the document viewer (a feature even v3 lacked), restored page thumbnails, and early blocking of unsupported formats (.hwp, etc.) before upload.'
+---
+
+import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
+
+## Background
+
+The v4 meeting room had reached feature parity with v3, but its controls were scattered. Layout modes (default/presenter/speaker/seminar) and share categories lived in a header-center toggle, meeting options in a right slide-out sidebar, and device switching deep inside the full settings dialog. Someone arriving for the first time via an invite link had to go through a nickname page and then a device setup page, and refreshing mid-meeting bounced them to the lobby, losing the room.
+
+In document sharing mode, a 122px video strip was permanently pinned to the top, constantly eating into the document's vertical space. The reference users were familiar with was Google Meet, and the goal was a meeting room at that level — one where "the controls are where they should be."
+
+## Approach
+
+<RevealOnScroll client:visible>
+  I started by building a **reusable anchored menu kit**. I generalized the logic already proven in the existing mode popover — portal, trigger-relative positioning (opening upward from the footer), focus-trap, close on Esc and outside click, ↑↓/Home/End keyboard navigation, the `menu` role — and extracted it into a shared primitive. The share menu, meeting options, view adjustments, and mic/camera device selection were all then built on top of this kit.
+</RevealOnScroll>
+
+On top of that, I rearranged the controls. Pressing the single footer share button opens [Screen share / Document share / Shared notes / VOD] upward, and on devices that don't support screen sharing (iOS), only that item is disabled so document sharing remains available. Meeting options, previously a right sidebar, became an anchored dropdown above the footer ⋯ button, with a 'View adjustments' section at the top that the layout modes moved into. That let me remove the 2 header-center toggles, leaving a minimal header. The chevron next to the mic/camera buttons switches devices and speakers instantly without opening the full settings, and voice modulation and background effects went into that same row.
+
+> Because I swapped only the containers and left the items, callbacks, and host gating as they were, I could change the UI structure substantially while keeping the existing tests.
+
+**I merged the entry flow into a single pre-join page.** If permissions haven't been granted, I check via the `Permissions API` and first show a "Do you want participants to see and hear you?" modal (allow both / choose individually / continue without), then lay out a 16:9 preview, round toggles, device chips, name input, and [Join] on one screen. Both invite links and the lobby go straight to this page, and the nickname commit and guest login moved to the moment of [Join]. I updated the 21 affected e2e specs to the new selectors in one pass. For rejoin on refresh, I keep the room info in `sessionStorage`, distinguishing a same-tab refresh (1-click rejoin) from pasting the URL into a new tab (which doesn't drop you into the previous room).
+
+I turned the fixed document sharing strip into a **draggable PiP**. The catch: in document sharing mode, this video grid is the only thing that notifies the remote track receive resolution, so "removing" it would cut off the video. So I kept it mounted with the same props and only moved its position into a floating card. Because the browser's native PiP can hold only a single video and doesn't fit a multi-participant grid, I chose an in-app approach. In the document viewer, I added page navigation via arrow keys, PageUp/Down, wheel, and trackpad (an accumulation threshold + cooldown to prevent multiple page flips from inertia), page thumbnails, and file extension validation before upload.
+
+Finally, I measured the slow first click on option tabs with Playwright (security tab 1,026ms, invite 330ms), and once the meeting room has settled, I prefetch the 23 sub-panel lazy chunks in the background with `requestIdleCallback`, showing a skeleton immediately if they're still loading. For a bug where tabs wouldn't reopen after closing options by clicking the background, two guess-based fixes missed; I then pinned down the cause (sub-panel open state not being reset) by reproducing and measuring it in a real browser, and reset it all in one place.
+
+## Results
+
+- Pages between an invite link and entering the meeting room **2 → 1** (permission modal + unified pre-join), with a 1-click rejoin to the same room on refresh.
+- Permanent document sharing video strip **122px → 0**, moved into a draggable PiP — receive-resolution notification contract preserved.
+- One anchored menu kit unifies share, options, view adjustments, and device switching; **2 header-center toggles removed**.
+- Idle prefetch of **23** option sub-panel lazy chunks + skeletons — eases first-open delays of up to 1,026ms.
+- Keyboard, wheel, and trackpad page navigation in the document viewer (new), restored thumbnails, early blocking of unsupported formats.
+- Over 3 days, unit tests went 2,488 → 2,554, and 21 e2e specs were updated to the new pre-join flow.
+
+## What I Learned
+
+What I was most careful about in rearranging the UI was "breaking an invisible contract while moving something visible." On screen, the document sharing video strip looked almost decorative, but it was actually what determined video receive quality — had I deleted it without knowing that, every participant's video would have dropped to low resolution during document sharing. I no longer skip the step of first analyzing *what a component is responsible for* before moving it.
+
+Also, some things — like a slide animation and a chat preview toast — I built in response to user feedback and then rolled back. Because they were built on the shared kit, rolling back was cheap, which let me try several iterations quickly between the reference and how it actually felt to use.

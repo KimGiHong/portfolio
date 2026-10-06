@@ -5,28 +5,41 @@ import PaperTexture from '@/components/effects/PaperTexture.astro';
 import ScrollProgress from '@/components/effects/ScrollProgress.tsx';
 import Header from '@/components/layout/Header.astro';
 import Footer from '@/components/layout/Footer.astro';
+import {
+  getLocaleFromPath,
+  locales,
+  ogLocale,
+  switchLocalePath,
+  type Locale,
+} from '@/i18n';
 
 interface Props {
   title: string;
   description?: string;
   ogImage?: string;
-  lang?: string;
+  /** Defaults to the locale implied by the URL (/en/… → 'en'). */
+  locale?: Locale;
 }
 
 const {
   title,
   description = '',
   ogImage,
-  lang = 'ko',
+  locale = getLocaleFromPath(Astro.url.pathname),
 } = Astro.props;
 
-const canonicalURL = new URL(Astro.url.pathname, Astro.site ?? Astro.url);
+const site = Astro.site ?? Astro.url;
+const canonicalURL = new URL(Astro.url.pathname, site);
+const alternates = locales.map((l) => ({
+  locale: l,
+  href: new URL(switchLocalePath(Astro.url.pathname, l), site).toString(),
+}));
 // Default OG image — 한지 톤 1200×630 PNG (generated from og-image.svg via sharp).
 const resolvedOgImage = new URL(ogImage ?? '/og-image.png', Astro.site ?? Astro.url).toString();
 ---
 
 <!doctype html>
-<html lang={lang} class="scroll-smooth">
+<html lang={locale} class="scroll-smooth">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -36,8 +49,11 @@ const resolvedOgImage = new URL(ogImage ?? '/og-image.png', Astro.site ?? Astro.
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={canonicalURL.toString()} />
+    {alternates.map((alt) => <link rel="alternate" hreflang={alt.locale} href={alt.href} />)}
+    <link rel="alternate" hreflang="x-default" href={alternates[0].href} />
 
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content={ogLocale[locale]} />
     <meta property="og:title" content={title} />
     {description && <meta property="og:description" content={description} />}
     <meta property="og:image" content={resolvedOgImage} />
