@@ -36,9 +36,10 @@ const updated = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(
 ---
 
 <BaseLayout
-  title={`Resume — ${profile.name.en}`}
-  description={t('resume.description')}
+  title={`${t('meta.resume.title')} — ${t('meta.titleSuffix')}`}
+  description={t('meta.resume.description')}
   locale={locale}
+  schema={{ kind: 'profile' }}
 >
   <Container size="default" class="pt-20 pb-12 sm:pt-28 print:pt-0 print:pb-0">
     <div class="print:hidden flex items-center justify-between gap-4 mb-12">

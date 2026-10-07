@@ -24,9 +24,10 @@ const seminarMarker = t('about.seminarMarker');
 ---
 
 <BaseLayout
-  title={`${profile.name.en} — ${getProfile('en').title}`}
-  description={profile.tagline}
+  title={t('meta.home.title')}
+  description={t('meta.home.description')}
   locale={locale}
+  schema={{ kind: 'profile' }}
 >
   <Container size="wide" class="pt-24 pb-28 sm:pt-32 sm:pb-36">
     <div class="flex flex-col gap-10 max-w-[64ch]">

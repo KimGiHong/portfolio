@@ -84,9 +84,24 @@ export const ui = {
     'case.implementation.mixed': 'Hybrid (handover era — hand-written → AI-paired)',
 
     'resume.savePdf': 'PDF로 저장',
-    'resume.description': '김기홍의 이력서',
 
     'notFound.title': '404 — 찾을 수 없는 지면',
+    'meta.siteName': '김기홍 포트폴리오',
+    'meta.titleSuffix': '김기홍 | 프론트엔드 개발자',
+    'meta.caseSuffix': '김기홍',
+    'meta.home.title': '김기홍 | 프론트엔드 개발자 포트폴리오',
+    'meta.home.description':
+      '프론트엔드 개발자 김기홍(KimGiHong)의 포트폴리오. MeetMate 화상회의 웹·모바일(React 19, React Native)과 LMS·NMS에서 성능·안정성·출시 경험을 수치로 정리한 27개 케이스 스터디.',
+    'meta.about.title': '소개',
+    'meta.about.description':
+      '프론트엔드 개발자 김기홍 소개 — 경력, 다루는 기술(React, React Native, TypeScript, WebRTC), Claude AI agent 페어 프로그래밍 방식과 사내 세미나 자료.',
+    'meta.projects.title': '프로젝트',
+    'meta.projects.description':
+      '김기홍의 프론트엔드 케이스 스터디 27개 — MeetMate 웹·모바일, LMS, NMS, CBR, ClassMate. 각 사례를 배경·접근·결과·배운 점으로 정리했습니다.',
+    'meta.resume.title': '이력서',
+    'meta.resume.description':
+      '프론트엔드 개발자 김기홍 이력서 — Querensys 2022.10–현재, 대표 성과와 기술 스택. 브라우저에서 PDF로 저장할 수 있습니다.',
+    'meta.breadcrumb.home': '홈',
   },
   en: {
     'nav.home': 'Home',
@@ -132,9 +147,24 @@ export const ui = {
     'case.implementation.mixed': 'Hybrid (handover era — hand-written → AI-paired)',
 
     'resume.savePdf': 'Save as PDF',
-    'resume.description': 'Resume of KimGiHong',
 
     'notFound.title': '404 — Page not found',
+    'meta.siteName': 'KimGiHong Portfolio',
+    'meta.titleSuffix': 'KimGiHong | Frontend Engineer',
+    'meta.caseSuffix': 'KimGiHong',
+    'meta.home.title': 'KimGiHong | Frontend Engineer Portfolio',
+    'meta.home.description':
+      'Portfolio of KimGiHong (김기홍), a frontend engineer in Seoul. 27 case studies on performance, reliability and shipping across the MeetMate video-conferencing web and mobile apps (React 19, React Native), an LMS and an NMS.',
+    'meta.about.title': 'About',
+    'meta.about.description':
+      'About KimGiHong, frontend engineer — experience, tools (React, React Native, TypeScript, WebRTC), the Claude AI-agent pair-programming workflow and in-house seminar materials.',
+    'meta.projects.title': 'Projects',
+    'meta.projects.description':
+      'Twenty-seven frontend case studies by KimGiHong — MeetMate web & mobile, LMS, NMS, CBR and ClassMate, each written up as background, approach, results and lessons learned.',
+    'meta.resume.title': 'Resume',
+    'meta.resume.description':
+      'Resume of KimGiHong, frontend engineer — Querensys 2022.10–present, key achievements and tech stack. Printable to PDF from the browser.',
+    'meta.breadcrumb.home': 'Home',
   },
 } as const satisfies Record<Locale, Record<string, string>>;
 

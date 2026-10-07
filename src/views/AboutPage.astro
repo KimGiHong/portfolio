@@ -20,9 +20,10 @@ const talkNote = t('about.talk.langNote');
 ---
 
 <BaseLayout
-  title={`About — ${profile.name.en}`}
-  description={profile.tagline}
+  title={`${t('meta.about.title')} — ${t('meta.titleSuffix')}`}
+  description={t('meta.about.description')}
   locale={locale}
+  schema={{ kind: 'profile' }}
 >
   <Container size="default" class="pt-24 pb-16 sm:pt-32">
     <RevealOnScroll client:load>

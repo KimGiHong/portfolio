@@ -29,7 +29,21 @@ const next =
     : null;
 ---
 
-<BaseLayout title={`${data.title} — KimGiHong`} description={data.summary} locale={locale}>
+<BaseLayout
+  title={`${data.title} — ${t('meta.caseSuffix')}`}
+  description={data.summary}
+  locale={locale}
+  schema={{
+    kind: 'article',
+    headline: data.title,
+    keywords: [data.product, ...data.stack],
+    breadcrumb: [
+      { name: t('meta.breadcrumb.home'), path: localizePath('/', locale) },
+      { name: t('meta.projects.title'), path: localizePath('/projects/', locale) },
+      { name: data.title, path: localizePath(`/projects/${project.id}/`, locale) },
+    ],
+  }}
+>
   <Container size="default" class="pt-24 pb-12 sm:pt-32">
     <RevealOnScroll client:load>
       <div class="flex items-center gap-2 text-ink-subtle">

@@ -4,7 +4,6 @@ import Container from '@/components/layout/Container.astro';
 import SectionTitle from '@/components/ui/SectionTitle.astro';
 import Chip from '@/components/ui/Chip.astro';
 import RevealOnScroll from '@/components/ui/RevealOnScroll.tsx';
-import { getProfile } from '@/content/profile';
 import { getProductMeta, productOrder } from '@/content/products';
 import { getProjects } from '@/lib/projects';
 import { localizePath, useTranslations, type Locale } from '@/i18n';
@@ -15,7 +14,6 @@ interface Props {
 
 const { locale } = Astro.props;
 const t = useTranslations(locale);
-const profile = getProfile(locale);
 const projects = await getProjects(locale);
 
 const groups = productOrder
@@ -28,9 +26,10 @@ const groups = productOrder
 ---
 
 <BaseLayout
-  title={`Projects — ${profile.name.en}`}
-  description={profile.tagline}
+  title={`${t('meta.projects.title')} — ${t('meta.titleSuffix')}`}
+  description={t('meta.projects.description')}
   locale={locale}
+  schema={{ kind: 'collection' }}
 >
   <Container size="wide" class="pt-24 pb-6 sm:pt-32">
     <RevealOnScroll client:load>
