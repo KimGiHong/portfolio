@@ -17,7 +17,8 @@
 - **인터랙션**: React 19 islands + Motion (Framer Motion 후속)
 - **콘텐츠**: MDX + Astro Content Collections (Zod schema)
 - **타이포그래피**: Fraunces (영문 디스플레이) · Gowun Batang (한글 디스플레이) · Pretendard (본문) · JetBrains Mono
-- **다국어**: 한국어 루트 + `/en` 미러, `hreflang` 대체 링크, 언어별 sitemap
+- **다국어**: 한국어 루트 + `/en` 미러, `hreflang` 대체 링크
+- **검색 비노출**: 링크 공유 전용 — 모든 응답에 `noindex, nofollow` (meta + `X-Robots-Tag`)
 - **PDF 출력**: `@media print` CSS — 이력서 페이지(`/resume`)는 브라우저 인쇄로 ATS-friendly PDF 출력 가능
 
 ## 인터랙티브 모먼트 3가지

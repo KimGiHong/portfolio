@@ -1,4 +1,4 @@
+# Crawling stays allowed so crawlers can read the noindex directive
+# (a Disallow here would hide it and could leave URLs indexed).
 User-agent: *
 Allow: /
-
-Sitemap: https://kimgihong.vercel.app/sitemap-index.xml

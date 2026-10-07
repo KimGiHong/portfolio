@@ -56,6 +56,8 @@ const resolvedOgImage = new URL(ogImage ?? '/og-image.png', Astro.site ?? Astro.
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#FAF6EC" />
+    <!-- Link-only sharing: kept out of search engines on purpose (2026-10). -->
+    <meta name="robots" content="noindex, nofollow" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
 
